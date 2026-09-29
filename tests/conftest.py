@@ -13,6 +13,15 @@ from vinted_sniper.db.repo import Repo
 from vinted_sniper.vinted.transport import Response
 
 
+def _is_catalog_request(url: str) -> bool:
+    """Whether a URL asks the catalogue API rather than the site's own pages.
+
+    The catalogue lives on a separate host now, and the filter endpoints on another path
+    than the catalogue used to use, so both shapes are recognised.
+    """
+    return url.startswith("https://api.vinted.") or "/api/v2/" in url
+
+
 class ScriptedTransport:
     """A transport that answers with whatever the test lined up.
 
@@ -60,8 +69,11 @@ class ScriptedTransport:
         self.requests.append({"url": url, "headers": headers, "cookies": cookies, "params": params})
 
         # Homepage requests succeed with a session cookie unless a test says otherwise, so
-        # that tests about the catalog do not have to set one up.
-        if "/api/v2/" not in url:
+        # that tests about the catalog do not have to set one up. Which requests count as
+        # the catalog is decided by the endpoint itself rather than by a path fragment,
+        # so moving the API to another host does not quietly reroute every catalog test
+        # into the homepage branch.
+        if not _is_catalog_request(url):
             if self.root_responses:
                 return self.root_responses.pop(0)
             return Response(

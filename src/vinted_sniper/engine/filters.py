@@ -42,11 +42,29 @@ def check(item: Item, query: Query) -> Rejection | None:
                 f"{payable} above limit {query.max_total_price} (buyer protection included)",
             )
 
-    if query.conditions and (item.condition or "").lower() not in {
-        condition.lower() for condition in query.conditions
-    }:
-        return Rejection("condition", f"condition {item.condition!r} not wanted")
+    if (rejection := _condition_rejection(item, query)) is not None:
+        return rejection
 
+    return None
+
+
+def _condition_rejection(item: Item, query: Query) -> Rejection | None:
+    """Whether the listing's condition is one the user asked to hear about.
+
+    A listing that states no condition cannot be shown to be one of the wanted ones,
+    so it is dropped when the allowlist has been narrowed — and dropped for the reason
+    that is true. Reporting it as a condition the user rejected is a claim about the
+    listing that nobody can make. When no conditions were asked for, nothing here
+    applies, which is the case that matters most: an optional filter must never be the
+    reason a valid listing goes unmentioned.
+    """
+    if not query.conditions:
+        return None
+    if item.condition is None:
+        return Rejection("condition_unknown", "listing does not state a condition")
+    wanted = {condition.lower() for condition in query.conditions}
+    if item.condition.lower() not in wanted:
+        return Rejection("condition", f"condition {item.condition!r} not wanted")
     return None
 
 

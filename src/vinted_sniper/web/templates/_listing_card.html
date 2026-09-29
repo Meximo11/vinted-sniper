@@ -1,0 +1,72 @@
+{% import "_icons.html" as ui %}
+
+{# One found listing. Photos lead because that is how a decision gets made, then the
+   two numbers that matter (what it says, and what it costs), then the facts that
+   decide whether it is worth a click. #}
+
+{% macro card(row) -%}
+<article class="listing">
+  {% if row.photos %}
+  <button type="button" class="photo" data-photos='{{ row.photos | tojson }}'
+          aria-label="View {{ row.photos | length }} photo{{ 's' if row.photos | length > 1 }} of {{ row.title }}">
+    <span class="photo-fallback" aria-hidden="true">{{ ui.icon("image") }}<span class="photo-fallback-text">Photo unavailable</span></span>
+    <img src="{{ row.photos[0] }}" alt="" loading="lazy">
+    {% if row.photos | length > 1 %}
+    <span class="count">{{ ui.icon("image") }}{{ row.photos | length }} ▣</span>
+    {% endif %}
+  </button>
+  {% else %}
+  <div class="no-photo">
+    <span class="photo-fallback" aria-hidden="true">{{ ui.icon("image") }}<span class="photo-fallback-text">No photo</span></span>
+  </div>
+  {% endif %}
+  <div class="body">
+    <a class="title" href="{{ row.url }}" target="_blank" rel="noreferrer"
+       title="{{ row.title }}">{{ row.title }}</a>
+    <div class="price">
+      <strong>{% if row.price %}{{ row.price }}{% else %}<span class="faint">Unknown</span>{% endif %}</strong>
+      {% if row.total_price %}<span class="total">{{ row.total_price }} total</span>{% endif %}
+    </div>
+    {% if row.brand or row.size or row.condition %}
+    <div class="tags">
+      {% if row.brand %}<span class="tag brand">{{ row.brand }}</span>{% endif %}
+      {% if row.size %}<span class="tag">{{ row.size }}</span>{% endif %}
+      {% if row.condition %}<span class="tag">{{ row.condition }}</span>{% endif %}
+    </div>
+    {% endif %}
+    {% if row.seller_login or row.seller_stars or row.favourite_count %}
+    <div class="meta">
+      {% if row.seller_login %}
+        {% if row.seller_url %}
+        <a href="{{ row.seller_url }}" target="_blank" rel="noreferrer">@{{ row.seller_login }}</a>
+        {% else %}<span>@{{ row.seller_login }}</span>{% endif %}
+      {% endif %}
+      {% if row.seller_stars %}
+      <span>⭐ {{ row.seller_stars }}{% if row.seller_feedback_count %} ({{ row.seller_feedback_count }}){% endif %}</span>
+      {% endif %}
+      {% if row.favourite_count %}<span>♥ {{ row.favourite_count }}</span>{% endif %}
+    </div>
+    {% endif %}
+    <div class="meta foot">
+      <span class="search-name">{{ row.query_name or 'Unassigned' }}</span>
+      <span class="age nowrap">{{ row.age }}</span>
+    </div>
+  </div>
+</article>
+{%- endmacro %}
+
+
+{% macro grid(rows) -%}
+<div class="listing-grid">
+  {% for row in rows %}{{ card(row) }}{% endfor %}
+</div>
+{%- endmacro %}
+
+
+{% macro empty(title, body) -%}
+<div class="card empty">
+  {{ ui.icon("box") }}
+  <h3>{{ title }}</h3>
+  <p>{{ body }}</p>
+</div>
+{%- endmacro %}

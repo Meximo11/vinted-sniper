@@ -1,0 +1,2120 @@
+/* Vinted Sniper — dashboard styles.
+ *
+ * A tool, not a poster. People leave this open on a second monitor and read it
+ * dozens of times a day, so the job is to be quiet, dense and quick to scan.
+ *
+ * The design language borrows Apple's, and borrows it in the places Apple
+ * actually uses it:
+ *
+ *  - Material, not decoration. Translucency belongs to the two layers that float
+ *    over scrolling content (the sidebar and the top bar) and nowhere else.
+ *    Panels are opaque. A page where every card is frosted is soup, and the
+ *    photographs stop being the only thing worth looking at.
+ *  - Light catches the top edge of a material, so the chrome gets a one-pixel
+ *    inner highlight. Content does not slide under a hard rule, it dissolves:
+ *    the floating layers fade their own bottom edge instead of drawing a border.
+ *  - Type is set as weight + size + leading + tracking together, never size
+ *    alone. Tracking is size-specific: large text is set tight, small text is
+ *    set slightly open, because the same value is wrong at both ends. Only
+ *    standard weights (400/500/600/700) are used, since 550 and 650 snap
+ *    unpredictably on a static system font.
+ *  - Depth is a hairline plus a whisper of shadow. Bigger surfaces get more of
+ *    both. Nothing casts a shadow you would notice with your eyes closed.
+ *  - Feedback lands on press, not on release, at 100ms, from 0.97. Motion uses
+ *    one settle curve and is gated behind prefers-reduced-motion.
+ *
+ * Colour is spent on state and almost nowhere else: one accent (teal) and four
+ * status colours, each meaning exactly one thing.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* --- Surfaces -----------------------------------------------------------------
+   * A single neutral ramp, faintly blue so photographs sit on it rather than
+   * fight it. Panels are opaque; see the header for why. */
+  --bg: #0b0e12;
+  --surface: #161a20;
+  --surface-raised: #1d222a;
+  --surface-sunken: #101419;
+  --surface-hover: #232932;
+
+  --line: rgba(150, 172, 200, 0.13);
+  --line-strong: rgba(150, 172, 200, 0.24);
+
+  --ink: #e8edf4;
+  --ink-muted: #9aa8ba;
+  --ink-faint: #7e8a9b;
+
+  /* One accent. Teal, warmed a little so it stays legible on a dark field. */
+  --accent: #35c9b6;
+  --accent-strong: #1ea795;
+  --accent-ink: #04211d;
+  --accent-wash: rgba(53, 201, 182, 0.11);
+  --accent-line: rgba(53, 201, 182, 0.34);
+
+  /* Status. Each hue means one thing and is never used decoratively. */
+  --ok: #3fcf8e;
+  --ok-wash: rgba(63, 207, 142, 0.12);
+  --warn: #e0a83a;
+  --warn-wash: rgba(224, 168, 58, 0.12);
+  --bad: #f2748c;
+  --bad-wash: rgba(242, 116, 140, 0.12);
+  --info: #5fa8f5;
+  --info-wash: rgba(95, 168, 245, 0.12);
+
+  /* --- Material: the two layers that float over scrolling content ---------------
+   * Heavier than the surfaces they sit on, because they are structural. The
+   * inner highlight is light catching the top edge of the material, which is
+   * what separates a floating layer from a flat rectangle. */
+  --material-bg: rgba(20, 25, 32, 0.72);
+  /* Structural regions get a heavier material than toolbars. A drawer sits over
+     whatever the page happens to be showing, and a photograph under a nav label
+     has to lose to the label, so this one is close to opaque. */
+  --material-heavy: rgba(18, 23, 30, 0.92);
+  --material-blur: 22px;
+  --material-edge: rgba(255, 255, 255, 0.07);
+  --material-hairline: rgba(150, 172, 200, 0.11);
+  /* The fade a floating layer uses instead of a hard rule, so content dissolves
+   * under it rather than being cut off by one. */
+  --edge-fade: 1.5rem;
+
+  /* --- Radius: one scale, applied everywhere -----------------------------------
+   * Radius grows with the size of the thing, the way Apple's does: a field you
+   * type into stays crisp, a large panel softens. */
+  --r-input: 7px;
+  --r: 10px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+
+  /* --- Depth: a hairline plus a whisper -----------------------------------------
+   * Cards get the least, floating things get the most. Nothing here is strong
+   * enough to read as a glow. */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --shadow-raised: 0 4px 14px rgba(0, 0, 0, 0.36);
+  --shadow-overlay: 0 18px 48px rgba(0, 0, 0, 0.5);
+  --shadow-drawer: 0 0 64px rgba(0, 0, 0, 0.52);
+
+  /* --- Focus: a ring that survives whatever it lands on ------------------------ */
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+
+  /* --- Type ---------------------------------------------------------------------
+   * Tracking and leading are per size, never one value for the page. Large text
+   * wants negative tracking because letters read too far apart as they grow;
+   * small text wants a little positive tracking to stay legible. */
+  --track-display: -0.022em;
+  --track-title: -0.014em;
+  --track-body: -0.005em;
+  --track-caption: 0.008em;
+
+  --lead-tight: 1.14;
+  --lead-snug: 1.3;
+  --lead-body: 1.55;
+  --lead-loose: 1.65;
+
+  /* Only standard weights. 550 and 650 are variable-font values and snap to
+   * whatever the resolved face happens to offer, which reads as inconsistent. */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* --- Motion -------------------------------------------------------------------
+   * --ease-settle is the curve iOS uses to present a sheet or a sidebar. It
+   * leaves fast and arrives with no overshoot, which is what a critically
+   * damped spring does, and it is what makes a panel feel weighted rather than
+   * merely animated. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-settle: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --t-press: 100ms;
+  --t-fast: 150ms;
+  --t-base: 220ms;
+  --t-slow: 320ms;
+
+  --sidebar-w: 15rem;
+  --header-h: 3.5rem;
+  --gutter: 1.5rem;
+
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --surface: #ffffff;
+    --surface-raised: #ffffff;
+    --surface-sunken: #eeeef1;
+    --surface-hover: #f0f0f3;
+
+    --line: rgba(15, 23, 42, 0.11);
+    --line-strong: rgba(15, 23, 42, 0.2);
+
+    --ink: #0f172a;
+    --ink-muted: #4a5768;
+    --ink-faint: #5d6a7d;
+
+    --accent: #0f766e;
+    --accent-strong: #115e59;
+    --accent-ink: #ffffff;
+    --accent-wash: rgba(15, 118, 110, 0.08);
+    --accent-line: rgba(15, 118, 110, 0.32);
+
+    --ok: #0f7a52;
+    --ok-wash: rgba(15, 122, 82, 0.09);
+    --warn: #8a5a06;
+    --warn-wash: rgba(138, 90, 6, 0.09);
+    --bad: #b81f3f;
+    --bad-wash: rgba(184, 31, 63, 0.08);
+    --info: #1a56c4;
+    --info-wash: rgba(26, 86, 196, 0.08);
+
+    /* In light the material is lighter than the page, not darker, and the light
+       that catches its top edge is a white line rather than a shadow. */
+    --material-bg: rgba(250, 250, 252, 0.74);
+    --material-heavy: rgba(248, 248, 250, 0.94);
+    --material-edge: rgba(255, 255, 255, 0.85);
+    --material-hairline: rgba(15, 23, 42, 0.1);
+
+    --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05);
+    --shadow-raised: 0 4px 14px rgba(15, 23, 42, 0.09);
+    --shadow-overlay: 0 18px 48px rgba(15, 23, 42, 0.18);
+    --shadow-drawer: 0 0 64px rgba(15, 23, 42, 0.2);
+  }
+}
+
+/* Two more signals the system already understands, and both change the material
+   rather than just the animation. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --material-bg: var(--surface);
+    --material-heavy: var(--surface);
+    --material-edge: transparent;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --line: var(--line-strong);
+    --material-bg: var(--surface);
+    --material-heavy: var(--surface);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14.5px;
+  font-weight: var(--weight-regular);
+  line-height: var(--lead-body);
+  letter-spacing: var(--track-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* The system face already ships optical sizing, so let it adjust rather than
+     forcing one drawing for every size. */
+  font-optical-sizing: auto;
+  font-synthesis: none;
+}
+
+/* Headings carry their own tracking and leading, because both move with size.
+   Using one value for all four is the mistake that makes a page read as generic. */
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: var(--weight-semibold);
+  text-wrap: balance;
+}
+h1 {
+  font-size: 1.35rem;
+  line-height: var(--lead-tight);
+  letter-spacing: var(--track-display);
+}
+h2 {
+  font-size: 1.05rem;
+  line-height: var(--lead-snug);
+  letter-spacing: var(--track-title);
+}
+h3 {
+  font-size: 0.95rem;
+  line-height: var(--lead-snug);
+  letter-spacing: var(--track-title);
+}
+h4 {
+  font-size: 0.875rem;
+  line-height: var(--lead-snug);
+  letter-spacing: var(--track-body);
+  font-weight: var(--weight-medium);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  /* Underline that appears on hover rather than one that is always there: it
+     keeps a paragraph of links readable and still marks them as live. */
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 30%, transparent);
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+  transition: text-decoration-color var(--t-fast) var(--ease-out);
+}
+a:hover {
+  text-decoration-color: currentColor;
+}
+
+/* A focus ring that holds up on any surface: a gap in the page colour, then the
+   accent, so it reads on a card, on a photo and on the blurred chrome alike. */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--r-input);
+}
+
+.muted {
+  color: var(--ink-muted);
+}
+.faint {
+  color: var(--ink-faint);
+}
+.text-bad {
+  color: var(--bad);
+}
+.text-warn {
+  color: var(--warn);
+}
+.mono {
+  font-family: var(--mono);
+  font-size: 0.86em;
+}
+.nowrap {
+  white-space: nowrap;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  top: 0;
+  left: 0.75rem;
+  z-index: 100;
+  padding: 0.55rem 0.9rem;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: var(--r-input);
+  font-weight: var(--weight-semibold);
+  transform: translateY(-120%);
+  transition: transform var(--t-fast) var(--ease-out);
+}
+.skip-link:focus {
+  transform: translateY(0.75rem);
+}
+
+/* --- App shell ------------------------------------------------------------------ */
+
+.app {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+/* On a wide screen the sidebar is a column, not a floating layer: nothing
+   scrolls underneath it, so a blur would cost paint and buy nothing. It is
+   opaque here and becomes a material only when it slides over the page. */
+.sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.85rem 0.7rem;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  /* Light catching the top-left edge, the same treatment the top bar gets. */
+  box-shadow: inset 0 1px 0 var(--material-edge);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.2rem 0.45rem 0.9rem;
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.015em;
+}
+.brand:hover {
+  text-decoration: none;
+}
+.brand .mark {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--r-input);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.brand .mark svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: var(--r-input);
+  color: var(--ink-muted);
+  font-size: 0.88rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--track-body);
+  text-decoration: none;
+  transition:
+    background var(--t-fast) var(--ease-out),
+    color var(--t-fast) var(--ease-out);
+}
+.nav-link[aria-current="page"] {
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-weight: var(--weight-semibold);
+}
+.nav-link svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+/* A count, not a badge: quiet, no fill, so the number reads as data. */
+.nav-link .count {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-faint);
+}
+
+/* The queue depth at the bottom of the sidebar. A one-line answer to "is anything
+   waiting", deliberately not a stat tile: it is context, not a metric. */
+.sidebar-status {
+  padding: 0.5rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-input);
+  background: var(--surface-sunken);
+}
+.sidebar-status .label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+}
+.sidebar-status .label svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  color: var(--ok);
+}
+.sidebar-status.is-bad .label svg {
+  color: var(--bad);
+}
+.sidebar-status-detail {
+  margin-top: 0.1rem;
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.sidebar-foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--line);
+}
+
+.main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-height: var(--header-h);
+  padding: 0.55rem var(--gutter);
+  /* A real material: content scrolls beneath this, so it is translucent, it is
+     heavier than the panels below it, and it carries the bright top edge that
+     says "this is a layer floating above the page". */
+  background: var(--material-bg);
+  backdrop-filter: blur(var(--material-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--material-blur)) saturate(180%);
+  box-shadow: inset 0 1px 0 var(--material-edge);
+}
+/* No hard rule along the bottom. Content dissolves into the bar over a short
+   fade, which is what stops a sticky header from looking like a lid. */
+.topbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: var(--edge-fade);
+  background: linear-gradient(to bottom, var(--material-bg), transparent);
+  pointer-events: none;
+}
+.topbar h1 {
+  font-size: 1.05rem;
+  letter-spacing: var(--track-title);
+  /* Vibrancy: text over a translucent layer needs a little more weight and a
+     little more space between letters to stay crisp against a moving
+     background. */
+  font-weight: var(--weight-semibold);
+}
+.topbar .spacer {
+  margin-left: auto;
+}
+
+.menu-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--r-input);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out);
+}
+.menu-toggle:hover {
+  background: var(--surface-hover);
+  border-color: var(--line-strong);
+}
+.menu-toggle svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.content {
+  width: 100%;
+  max-width: 82rem;
+  margin: 0 auto;
+  padding: var(--gutter);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* --- Panels ---------------------------------------------------------------------
+ * A hairline plus a shadow you would not notice. Enough to sit the panel on the
+ * page; not enough to read as a stack of separate objects. */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-card);
+}
+.card-pad {
+  padding: 1rem 1.1rem;
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 0.7rem;
+}
+.section-head h2 {
+  font-size: 0.95rem;
+}
+.section-head .spacer {
+  margin-left: auto;
+}
+/* A quiet paragraph that explains the section above it. */
+.section-note {
+  margin: 0.6rem 0 0;
+  max-width: 46rem;
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+}
+/* A label for a group of controls that has no single input of its own. */
+.group-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: var(--weight-medium);
+  color: var(--ink-muted);
+}
+
+/* The URL field and its builder toggle share a line on wide screens and wrap
+   onto two lines when they run out of room. */
+.url-row {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.url-row > input {
+  flex: 1;
+  min-width: 14rem;
+}
+
+/* A short label sitting above a chart, naming what the bars are. */
+.chart-label {
+  display: block;
+  margin-bottom: 0.1rem;
+  font-size: 0.85rem;
+  font-weight: var(--weight-medium);
+  color: var(--ink-muted);
+}
+/* Found and delivered sit side by side on a wide screen. The question this page
+   answers is how much of what was found got sent, and a shared baseline turns
+   that from arithmetic into a glance. They stack once there is no room. */
+.chart-group {
+  display: grid;
+  gap: 1.2rem 2rem;
+  align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+}
+
+/* Spacing utilities, for the handful of one-off gaps that have no component. */
+.mt-sm {
+  margin-top: 0.4rem;
+}
+.mt-md {
+  margin-top: 0.9rem;
+}
+
+.section-sub {
+  margin: -0.35rem 0 0.7rem;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+}
+
+/* --- System status bar ----------------------------------------------------------
+ * Health is a verdict about the whole app, not a metric that belongs in the
+ * number row. It gets a full-width line that can only tint when something is
+ * wrong, so a healthy install is visually quiet. */
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+}
+.statusbar .dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: var(--r-pill);
+  background: var(--ok);
+  flex-shrink: 0;
+}
+.statusbar .spacer {
+  margin-left: auto;
+}
+.statusbar.warn {
+  border-color: color-mix(in srgb, var(--warn) 30%, transparent);
+  background: var(--warn-wash);
+  color: var(--warn);
+}
+.statusbar.warn .dot {
+  background: var(--warn);
+}
+.statusbar.bad {
+  border-color: color-mix(in srgb, var(--bad) 32%, transparent);
+  background: var(--bad-wash);
+  color: var(--bad);
+}
+.statusbar.bad .dot {
+  background: var(--bad);
+}
+.statusbar a {
+  color: inherit;
+  font-weight: var(--weight-medium);
+}
+
+/* --- Stat tiles ------------------------------------------------------------------
+ * Four counts, one rhythm: label, number, qualifier. Tabular figures so the digits
+ * line up as they change. Not interactive, so no hover lift. */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 0.6rem;
+}
+
+.stat {
+  padding: 0.75rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-card);
+}
+.stat .label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--track-caption);
+  color: var(--ink-muted);
+}
+.stat .label svg {
+  width: 0.85rem;
+  height: 0.85rem;
+  color: var(--ink-faint);
+}
+/* The largest type on the page, so it carries the tightest tracking. */
+.stat .value {
+  margin-top: 0.25rem;
+  font-size: 1.6rem;
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--track-display);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--lead-tight);
+}
+.stat .hint {
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  letter-spacing: var(--track-caption);
+  color: var(--ink-faint);
+}
+.stat.tone-ok .value {
+  color: var(--ok);
+}
+.stat.tone-bad .value {
+  color: var(--bad);
+}
+.stat.tone-warn .value {
+  color: var(--warn);
+}
+.stat.tone-accent .value {
+  color: var(--accent);
+}
+/* A tile whose value is a short phrase rather than a count, so the long number
+   size does not stretch it across the tile. */
+.stat .value-text {
+  margin-top: 0.35rem;
+  font-size: 0.95rem;
+  font-weight: var(--weight-medium);
+  line-height: 1.35;
+}
+
+/* --- Status pills ----------------------------------------------------------------
+ * A dot only where it carries real state. Never decorative. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--r-pill);
+  font-size: 0.75rem;
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+.pill::before {
+  content: "";
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: var(--r-pill);
+  background: currentColor;
+  flex-shrink: 0;
+}
+.pill.plain::before {
+  display: none;
+}
+.pill.ok {
+  background: var(--ok-wash);
+  color: var(--ok);
+}
+.pill.stale,
+.pill.starting,
+.pill.paused {
+  background: var(--warn-wash);
+  color: var(--warn);
+}
+.pill.failing,
+.pill.failed,
+.pill.disabled {
+  background: var(--bad-wash);
+  color: var(--bad);
+}
+.pill.info,
+.pill.connected {
+  background: var(--info-wash);
+  color: var(--info);
+}
+.pill.accent {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+/* --- Tables ---------------------------------------------------------------------
+ * Hairlines between rows, no fills. The hover wash is barely there on purpose:
+ * it should confirm the pointer is on a row, not repaint it. */
+.table-wrap {
+  position: relative;
+  overflow-x: auto;
+}
+/* The wrapper already scrolls, but a table with no floor never needs to: it
+   squeezes instead, wrapping a word every two letters and pushing the action
+   buttons off the right edge. Below this the columns stop reading normally. */
+.table-wrap table {
+  min-width: 42rem;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  letter-spacing: var(--track-body);
+}
+/* Column heads are the smallest type on the page, so they are the only place
+   that gets positive tracking. Numbers under them line up because the figures
+   are tabular, not because the columns are padded to match. */
+th {
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--track-caption);
+  color: var(--ink-faint);
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+td {
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+tbody tr {
+  transition: background var(--t-fast) var(--ease-out);
+}
+.cell-title {
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+}
+.cell-note {
+  margin-top: 0.1rem;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+.row-actions {
+  display: flex;
+  gap: 0.25rem;
+  justify-content: flex-end;
+  align-items: center;
+}
+/* The editor panel drops out of the table's stripe system so it reads as an
+   expansion of the row above, not as another row. */
+tr.disclosure-row td {
+  background: var(--surface-sunken);
+  padding: 0;
+  border-bottom: 1px solid var(--line);
+}
+tr.disclosure-row:hover {
+  background: var(--surface-sunken);
+}
+
+/* --- Buttons ---------------------------------------------------------------------
+ * Four levels, and they are all clearly different: filled (do this), surface
+ * (do this often), quiet (sideways action), danger (destroy). Sizes change
+ * padding only, so a small and a large button still match. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.7rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: var(--weight-medium);
+  line-height: 1.2;
+  letter-spacing: var(--track-body);
+  color: var(--ink);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-input);
+  cursor: pointer;
+  white-space: nowrap;
+  /* The press lands in 100ms from a small scale. Waiting for click to show
+     feedback is what makes a control feel dead under the finger. */
+  transition:
+    background var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out),
+    color var(--t-fast) var(--ease-out),
+    box-shadow var(--t-fast) var(--ease-out),
+    transform var(--t-press) var(--ease-out);
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btn svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex-shrink: 0;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-ink);
+  font-weight: var(--weight-semibold);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.btn-primary:hover {
+  background: var(--accent-strong);
+  border-color: transparent;
+}
+
+.btn-quiet {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-muted);
+}
+.btn-quiet:hover {
+  background: var(--surface-hover);
+  border-color: transparent;
+  color: var(--ink);
+}
+
+.btn-danger {
+  color: var(--bad);
+  background: transparent;
+  border-color: transparent;
+}
+.btn-danger:hover {
+  background: var(--bad-wash);
+  border-color: transparent;
+  color: var(--bad);
+}
+
+/* Hover is only offered where there is a real pointer. Ungated, a touch screen
+   keeps the hover state lit after a tap, which is how a row of buttons ends up
+   looking all pressed at once. */
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover {
+    border-color: var(--line-strong);
+    background: var(--surface-hover);
+    text-decoration: none;
+  }
+  .btn-primary:hover {
+    background: var(--accent-strong);
+    border-color: transparent;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.26);
+  }
+  .btn-quiet:hover {
+    background: var(--surface-hover);
+    border-color: transparent;
+    color: var(--ink);
+  }
+  .btn-danger:hover {
+    background: var(--bad-wash);
+    border-color: transparent;
+    color: var(--bad);
+  }
+  .nav-link:hover {
+    background: var(--surface-hover);
+    color: var(--ink);
+  }
+}
+
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+}
+.btn-sm svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+.btn-icon {
+  padding: 0.35rem;
+  width: 1.9rem;
+  height: 1.9rem;
+}
+
+form.inline {
+  display: inline;
+}
+
+/* --- Forms -----------------------------------------------------------------------
+ * Label above, field below, helper underneath. Fields are slightly darker than
+ * the panel they sit on so the well is visible without a heavy border. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  min-width: 0;
+}
+label {
+  font-size: 0.8rem;
+  font-weight: var(--weight-medium);
+  color: var(--ink-muted);
+}
+.hint {
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+}
+.hint a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+input[type="text"],
+input[type="url"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+select,
+textarea {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: var(--weight-regular);
+  letter-spacing: var(--track-body);
+  color: var(--ink);
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-input);
+  transition:
+    border-color var(--t-fast) var(--ease-out),
+    box-shadow var(--t-fast) var(--ease-out),
+    background var(--t-fast) var(--ease-out);
+}
+/* Focus is a filled ring on the accent, not an outline drawn outside the field:
+   it reads as the field itself becoming active. */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px var(--accent-wash);
+}
+@media (hover: hover) and (pointer: fine) {
+  input:hover,
+  select:hover,
+  textarea:hover {
+    border-color: var(--line-strong);
+  }
+}
+input::placeholder {
+  color: var(--ink-faint);
+  opacity: 1;
+}
+select {
+  appearance: none;
+  padding-right: 1.9rem;
+  /* One crisp chevron. Drawn as a data URI so it inherits currentColor and
+     needs no extra element or icon font. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%2397a6b9' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m3 4.5 3 3 3-3'/%3E%3C/svg%3E");
+  background-position: right 0.55rem center;
+  background-size: 12px 12px;
+  background-repeat: no-repeat;
+}
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
+  width: 0.95rem;
+  height: 0.95rem;
+  flex-shrink: 0;
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+  cursor: pointer;
+}
+.check-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+}
+
+.form-grid {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+}
+/* A form of short fields does not want the whole content column. Stretched to
+   82rem it leaves four small inputs marooned at the far end of a wide row. */
+.form-narrow {
+  max-width: 54rem;
+}
+.form-grid .span-all {
+  grid-column: 1 / -1;
+}
+.form-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 0.9rem;
+}
+
+/* --- Flash messages ----------------------------------------------------------------
+ * Transient feedback after a redirect. The entrance bridges the jump from the
+ * form page, which is exactly the "prevent a jarring change" case. */
+.flash {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--r);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 0.85rem;
+}
+.flash svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+.flash-error {
+  border-color: color-mix(in srgb, var(--bad) 34%, transparent);
+  background: var(--bad-wash);
+  color: var(--bad);
+}
+.flash-ok {
+  border-color: color-mix(in srgb, var(--ok) 34%, transparent);
+  background: var(--ok-wash);
+  color: var(--ok);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .flash {
+    transition: opacity var(--t-slow) var(--ease-out), transform var(--t-slow) var(--ease-out);
+    @starting-style {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+}
+
+/* --- Attention list ---------------------------------------------------------------- */
+.attention {
+  padding: 0.2rem 0;
+}
+.attention-row {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  padding: 0.55rem 0.9rem;
+}
+.attention-row + .attention-row {
+  border-top: 1px solid var(--line);
+}
+.attention-row > svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+  color: var(--bad);
+}
+.attention-row .spacer {
+  margin-left: auto;
+}
+.attention-row .when {
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
+/* --- Empty states -------------------------------------------------------------------- */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  color: var(--ink-muted);
+}
+.empty svg {
+  width: 1.6rem;
+  height: 1.6rem;
+  color: var(--ink-faint);
+  margin-bottom: 0.15rem;
+}
+.empty h3 {
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.empty p {
+  margin: 0;
+  max-width: 32rem;
+  font-size: 0.85rem;
+}
+
+/* --- Listing cards ---------------------------------------------------------------------
+ * Photo leads, then price, then the facts. The card is a link target, not a
+ * button, so the only motion is a border change on hover. */
+.listing-grid {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+}
+.listing {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+  transition: border-color var(--t-base) var(--ease-out), transform var(--t-base) var(--ease-out);
+}
+.listing .photo {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  padding: 0;
+  border: 0;
+  background: var(--surface-sunken);
+  cursor: zoom-in;
+}
+.listing .photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform var(--t-slow) var(--ease-out);
+}
+.listing .photo .count {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.05rem 0.35rem;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  border-radius: var(--r-input);
+  font-size: 0.7rem;
+  font-weight: var(--weight-semibold);
+}
+.listing .photo .count svg {
+  width: 0.7rem;
+  height: 0.7rem;
+}
+.listing .no-photo {
+  display: flex;
+  aspect-ratio: 4 / 5;
+  background: var(--surface-sunken);
+}
+
+/* What a photo area shows when there is no picture to show, whether the listing
+   never had one or the CDN refused to serve it. The box is already fixed by the
+   4/5 frame around it, so swapping the contents moves nothing on the page. The
+   words matter as much as the icon: a grey picture glyph on its own reads as a
+   placeholder image, which is not what happened. */
+.photo-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  height: 100%;
+  padding: 0.75rem;
+  text-align: center;
+  color: var(--ink-faint);
+  background: var(--surface-sunken);
+}
+.photo-fallback svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  opacity: 0.7;
+}
+.photo-fallback-text {
+  max-width: 8rem;
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+
+/* Held back until the image is known to be dead, so a photo that is merely
+   still arriving does not flash a placeholder on top of it. */
+.photo .photo-fallback {
+  display: none;
+}
+.photo.is-broken .photo-fallback {
+  display: flex;
+}
+.photo.is-broken img {
+  display: none;
+}
+.listing .body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1;
+  padding: 0.55rem 0.65rem 0.6rem;
+}
+.listing .title {
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+  font-size: 0.85rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.listing .title:hover {
+  color: var(--accent);
+  text-decoration: none;
+}
+.listing .price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+.listing .price strong {
+  font-size: 0.95rem;
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.listing .price .total {
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.listing .tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+.tag {
+  max-width: 100%;
+  padding: 0.02rem 0.35rem;
+  border: 1px solid var(--line);
+  background: var(--surface-sunken);
+  border-radius: var(--r-input);
+  font-size: 0.7rem;
+  color: var(--ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tag.brand {
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+}
+.listing .meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.55rem;
+  font-size: 0.74rem;
+  color: var(--ink-faint);
+}
+.listing .meta a {
+  color: inherit;
+}
+.listing .foot {
+  margin-top: auto;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--line);
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  font-size: 0.74rem;
+  color: var(--ink-faint);
+}
+.listing .foot .search-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+
+/* Hover is a pointer affordance. Gate it, or a tap on a phone fires it on the
+   way to opening the photo and the card visibly jumps. */
+@media (hover: hover) and (pointer: fine) {
+  .listing:hover {
+    border-color: var(--line-strong);
+  }
+  .listing:hover .photo img {
+    transform: scale(1.025);
+  }
+  tbody tr:hover {
+    background: var(--surface-hover);
+  }
+  .dest:hover {
+    border-color: var(--line-strong);
+  }
+  .chart .bar-col:hover .bar {
+    opacity: 1;
+  }
+}
+
+/* A page of cards lands in well under half a second, and the stagger is capped
+   so the last card is not still arriving after the reader has started reading. */
+@media (prefers-reduced-motion: no-preference) {
+  .listing {
+    animation: card-in var(--t-slow) var(--ease-out) both;
+  }
+  .listing:nth-child(1) { animation-delay: 0ms; }
+  .listing:nth-child(2) { animation-delay: 24ms; }
+  .listing:nth-child(3) { animation-delay: 48ms; }
+  .listing:nth-child(4) { animation-delay: 72ms; }
+  .listing:nth-child(5) { animation-delay: 96ms; }
+  .listing:nth-child(6) { animation-delay: 120ms; }
+  .listing:nth-child(7) { animation-delay: 144ms; }
+  .listing:nth-child(8) { animation-delay: 168ms; }
+  .listing:nth-child(n + 9) { animation-delay: 184ms; }
+
+  @keyframes card-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+
+  /* The editor panel opening in place. The row is display:none until JS unhides
+     it, and a box that has just started being rendered is exactly what
+     @starting-style is for, so this needs no height animation and no JS timing.
+     It fades in and closes instantly, which is the asymmetry you want: the open
+     is a response to a deliberate click, the close is just getting out of the way. */
+  [data-disclosure-panel] {
+    animation: panel-in var(--t-base) var(--ease-settle);
+  }
+  @keyframes panel-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+}
+
+/* --- Photo lightbox ---------------------------------------------------------------------
+ * An overlay the user opened on purpose, so it gets a real entrance. It grows
+ * from just inside its final size rather than from nothing, and the picture
+ * itself does not scale, so the photograph never distorts while it settles. */
+/* Dim to focus: the page behind is both darkened and pushed back, so the
+   photograph is unambiguously the thing in front. The blur is what sells the
+   separation; the dim alone just looks like a dark overlay. */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 8, 12, 0.82);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+}
+.lightbox[hidden] {
+  display: none;
+}
+.lightbox img {
+  max-width: min(92vw, 56rem);
+  max-height: 86vh;
+  object-fit: contain;
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-overlay);
+}
+/* Same treatment inside the viewer: the overlay is nearly black, so the fallback
+   drops its own background and reads as part of the scrim rather than a panel. */
+.lightbox .photo-fallback {
+  display: none;
+  width: auto;
+  height: auto;
+  padding: 1.75rem 2rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-overlay);
+  color: var(--ink-muted);
+}
+.lightbox .photo-fallback-text {
+  max-width: 12rem;
+  font-size: 0.8rem;
+}
+.lightbox.is-broken .photo-fallback {
+  display: flex;
+}
+.lightbox.is-broken img {
+  display: none;
+}
+.lightbox button {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  /* A chip floating on the scrim, so it gets a material and a shadow of its
+     own rather than borrowing the panel treatment. */
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  box-shadow: var(--shadow-raised);
+  color: var(--ink);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out);
+}
+.lightbox button:hover {
+  background: var(--surface-hover);
+}
+.lightbox button:active {
+  transform: scale(0.94);
+}
+.lightbox .lb-close {
+  top: 0.9rem;
+  right: 0.9rem;
+}
+.lightbox .lb-prev {
+  left: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.lightbox .lb-next {
+  right: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.lightbox .lb-counter {
+  position: fixed;
+  bottom: 0.9rem;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--ink-muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  padding: 0.15rem 0.7rem;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lightbox {
+    animation: lb-in var(--t-slow) var(--ease-settle);
+  }
+  @keyframes lb-in {
+    from {
+      opacity: 0;
+      transform: scale(0.97);
+    }
+  }
+  .lightbox.is-closing {
+    animation: lb-out var(--t-fast) var(--ease-out) forwards;
+  }
+  @keyframes lb-out {
+    to {
+      opacity: 0;
+      transform: scale(0.98);
+    }
+  }
+}
+
+/* --- Search builder ------------------------------------------------------------------------- */
+#builder {
+  margin-top: 0.9rem;
+  padding: 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-input);
+  background: var(--surface-sunken);
+}
+.builder-block + .builder-block {
+  margin-top: 0.9rem;
+}
+.option-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.8rem;
+  max-height: 10rem;
+  overflow-y: auto;
+  padding: 0.2rem 0;
+}
+.option-list label {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: var(--weight-regular);
+  color: var(--ink);
+  cursor: pointer;
+}
+.option-list .count {
+  color: var(--ink-faint);
+  font-size: 0.72rem;
+}
+.crumb-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+.cat-node {
+  padding: 0.2rem 0.6rem;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  font-size: 0.82rem;
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: border-color var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
+}
+.cat-node:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.crumb {
+  background: none;
+  border: 0;
+  color: var(--accent);
+  padding: 0;
+  font-size: 0.82rem;
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+.crumb[aria-current] {
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+  cursor: default;
+}
+.chip {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: center;
+  padding: 0.1rem 0.55rem;
+  border-radius: var(--r-pill);
+  font-size: 0.78rem;
+  font-weight: var(--weight-medium);
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+.chip button {
+  background: none;
+  border: 0;
+  color: inherit;
+  padding: 0;
+  font-weight: var(--weight-bold);
+  line-height: 1;
+  cursor: pointer;
+}
+/* Anchored to the field it belongs to, and opens downward from that edge. */
+.combo {
+  position: relative;
+}
+.combo-list {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 3px);
+  left: 0;
+  right: 0;
+  max-height: 12rem;
+  overflow-y: auto;
+  background: var(--surface-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-input);
+  box-shadow: var(--shadow-overlay);
+  transform-origin: top center;
+}
+.combo-list[hidden] {
+  display: none;
+}
+.combo-list button {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background: none;
+  color: var(--ink);
+  border: 0;
+  text-align: left;
+  font-weight: var(--weight-regular);
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease-out);
+}
+.combo-list button:hover,
+.combo-list button:focus-visible {
+  background: var(--surface-hover);
+  outline: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .combo-list:not([hidden]) {
+    animation: menu-in var(--t-base) var(--ease-settle);
+  }
+  @keyframes menu-in {
+    from {
+      opacity: 0;
+      transform: translateY(-3px) scale(0.98);
+    }
+  }
+}
+
+/* --- Activity chart -------------------------------------------------------------------------- */
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.2rem;
+  height: 8.5rem;
+  padding: 0.6rem 0.2rem 0;
+}
+.chart .bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.3rem;
+  flex: 1;
+  /* Without this the columns refuse to shrink past the width of the date under
+     them, and fourteen of them push the chart out of the card. */
+  min-width: 0;
+  height: 100%;
+}
+/* Flat fill. A gradient on a bar implies a value it does not encode. */
+.chart .bar {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0.8;
+  transition: opacity var(--t-fast) var(--ease-out);
+}
+.chart .bar.zero {
+  background: var(--line-strong);
+  opacity: 1;
+}
+.chart .bar-label {
+  font-size: 0.64rem;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+/* Once the bars are too narrow to carry a date each, keep every other one so
+   the axis still reads as a run of days rather than a smear of digits. Removed
+   rather than hidden: a hidden label still claims its width. */
+@media (max-width: 64rem) {
+  .chart .bar-col:nth-child(even) .bar-label {
+    display: none;
+  }
+}
+.legend {
+  display: flex;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--ink-muted);
+  margin-top: 0.6rem;
+}
+.legend .key {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.legend .swatch {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 2px;
+}
+
+/* --- Destination cards ------------------------------------------------------------------------- */
+.dest-grid {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+}
+.dest {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.85rem 0.95rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  transition: border-color var(--t-base) var(--ease-out);
+}
+/* Dimmed rather than recoloured: a switched-off destination is still the user's,
+   it just is not being used, and greying it into the background loses that. */
+.dest.off {
+  background: var(--surface-sunken);
+}
+/* A switched-off destination still belongs to the user, so its name and icon
+   stay at full contrast and only the detail recedes. Fading the whole header
+   would take the "off" pill down with it, and that pill is the one thing on
+   the card that has to be readable. */
+.dest.off .target {
+  opacity: 0.6;
+}
+.dest-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.dest-icon {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--r-input);
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  color: var(--ink-muted);
+  flex-shrink: 0;
+}
+.dest-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+.dest h3 {
+  font-size: 0.9rem;
+  font-weight: var(--weight-medium);
+}
+.dest .kind-label {
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+}
+.dest-head .pill {
+  margin-left: auto;
+}
+.dest .target {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+  word-break: break-all;
+}
+.dest .reason {
+  font-size: 0.8rem;
+  color: var(--bad);
+}
+.dest-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--line);
+}
+
+/* Delivery record. Three numbers in a row, the slow one tinted. */
+.delivery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.1rem;
+  margin: 0;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--line);
+}
+.delivery > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+.delivery dt {
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+}
+.delivery dd {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+.delivery-slow dd {
+  color: var(--warn);
+}
+.delivery-failing dd,
+.delivery-note {
+  color: var(--bad);
+}
+.delivery-note {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+/* --- Listing browser ------------------------------------------------------------------------- */
+.filters {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  gap: 0.8rem;
+  align-items: end;
+}
+.filter-actions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  margin-top: 1.1rem;
+}
+.pager .gap {
+  padding: 0 0.3rem;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.pager .btn {
+  min-width: 2rem;
+  padding: 0.25rem 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+/* The current page is marked with weight and a wash rather than a solid fill,
+   which at this size would punch a bright hole in the bottom of the page. */
+.pager .is-current {
+  background: var(--accent-wash);
+  border-color: var(--accent-line);
+  color: var(--accent);
+  font-weight: var(--weight-semibold);
+}
+
+/* --- Standalone notice page ---------------------------------------------------------------------- */
+.centered-page {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 2rem 1.25rem;
+}
+.notice-card {
+  width: min(30rem, 100%);
+  padding: 2rem 1.75rem;
+  /* The largest single surface on the site, so it takes the largest radius and
+     the most shadow. Radius and depth both scale with the size of the thing. */
+  border-radius: var(--r-lg);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow-raised);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+}
+.notice-code {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: var(--weight-semibold);
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.notice-card h1 {
+  text-align: center;
+}
+.brand-centered {
+  justify-content: center;
+  padding: 0 0 0.25rem;
+}
+.login-form {
+  width: 100%;
+  text-align: left;
+}
+.notice-card h1 {
+  font-size: 1.15rem;
+  line-height: 1.4;
+}
+/* The card's own footnote is centred under a centred heading. The form is not:
+   its label, field, hint and button all share one left edge, which is what makes
+   a sign-in field look deliberate rather than assembled. */
+.notice-card > .hint {
+  margin: 0;
+  max-width: 26rem;
+  text-align: center;
+}
+.login-form .form-actions {
+  justify-content: flex-start;
+}
+
+/* --- Responsive ---------------------------------------------------------------------------------- */
+@media (max-width: 64rem) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* As an overlay the drawer is a floating layer, so it earns the material it
+     did not need as a column. It enters and leaves along the same path, from
+     the edge it is attached to. */
+  .sidebar {
+    position: fixed;
+    z-index: 40;
+    top: 0;
+    left: 0;
+    width: var(--sidebar-w);
+    transform: translateX(-100%);
+    transition: transform var(--t-slow) var(--ease-settle);
+    background: var(--material-heavy);
+    backdrop-filter: blur(var(--material-blur)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--material-blur)) saturate(180%);
+    border-right: 1px solid var(--material-hairline);
+    box-shadow: var(--shadow-drawer);
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  .menu-toggle {
+    display: inline-flex;
+  }
+  .nav-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    /* Dim to focus: the page behind the drawer is pushed back rather than just
+       darkened, so the drawer reads as the thing in front. */
+    background: rgba(3, 6, 12, 0.5);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+  }
+  .nav-scrim[hidden] {
+    display: none;
+  }
+  .filters {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .filter-actions {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 48rem) {
+  :root {
+    --gutter: 0.85rem;
+  }
+  body {
+    font-size: 14px;
+  }
+  .content {
+    padding: 1rem var(--gutter);
+    gap: 1.1rem;
+  }
+  .topbar {
+    padding-left: var(--gutter);
+    padding-right: var(--gutter);
+  }
+  .topbar h1 {
+    font-size: 0.98rem;
+  }
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .listing-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+  .dest-grid,
+  .form-grid,
+  .filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .row-actions {
+    justify-content: flex-start;
+  }
+  td,
+  th {
+    padding: 0.5rem 0.55rem;
+  }
+  .empty {
+    padding: 1.5rem 1rem;
+  }
+  .chart {
+    height: 6.5rem;
+  }
+  .attention-row {
+    padding: 0.5rem 0.7rem;
+  }
+  /* A phone cannot fit the message and its button on one line. A grid puts the
+     button on its own row, in the message's column, so it sits squarely under
+     the text it acts on instead of squeezing it into two ragged lines. */
+  .attention-row:has(> .btn) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 0.65rem;
+    row-gap: 0.5rem;
+    align-items: start;
+  }
+  .attention-row:has(> .btn) > .btn {
+    grid-column: 2;
+    justify-self: start;
+    margin-left: 0;
+  }
+}
+
+/* Touch targets. A 28px button is a miss for a thumb. */
+@media (pointer: coarse) {
+  .btn-sm,
+  .btn-icon {
+    min-height: 2.1rem;
+  }
+  .btn-sm {
+    padding: 0.4rem 0.6rem;
+  }
+  .nav-link {
+    padding: 0.55rem 0.55rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

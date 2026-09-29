@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -59,6 +60,48 @@ class QueryState:
         return self.last_success_at is None
 
 
+# Below this share of deliveries arriving, a destination is called failing rather than
+# merely unlucky. Below _SLOW_LATENCY_S it is called slow. Both are thresholds chosen to
+# be visible in a glance, not tuned against anything.
+_FAILING_SUCCESS_RATE = 0.9
+_SLOW_LATENCY_S = 30
+
+
+@dataclass(frozen=True, slots=True)
+class DeliveryStats:
+    """What one destination has done lately: did it work, and how late was it."""
+
+    destination_id: int
+    total: int = 0
+    sent: int = 0
+    failed: int = 0
+    mean_latency_s: float | None = None
+    median_latency_s: float | None = None
+    last_queued_at: int | None = None
+
+    @property
+    def success_rate(self) -> float | None:
+        """Share of its notifications that actually arrived, or None if none finished.
+
+        Retries and cancellations are excluded from the denominator: a notification that
+        was never tried is not something the destination refused.
+        """
+        finished = self.sent + self.failed
+        return self.sent / finished if finished else None
+
+    @property
+    def health(self) -> str:
+        """ok / slow / failing / idle — the one word the card leads with."""
+        if self.sent == 0:
+            return "failing" if self.failed else "idle"
+        rate = self.success_rate
+        if rate is not None and rate < _FAILING_SUCCESS_RATE:
+            return "failing"
+        if self.median_latency_s is not None and self.median_latency_s > _SLOW_LATENCY_S:
+            return "slow"
+        return "ok"
+
+
 @dataclass(frozen=True, slots=True)
 class Destination:
     """Somewhere notifications go."""
@@ -70,6 +113,14 @@ class Destination:
     active: bool = True
     notify_status: bool = False
     failure_count: int = 0
+    # Why the app switched it off, if it did. Worth showing: a destination that
+    # stopped receiving alerts with no explanation is the failure people report.
+    deactivated_reason: str | None = None
+
+    @property
+    def is_awaiting_pairing(self) -> bool:
+        """A Telegram destination created by the pairing link, not yet claimed."""
+        return self.kind == "telegram" and not self.config.get("chat_id")
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,6 +143,33 @@ def _json_list(raw: str | None) -> list[str] | None:
         return None
     value = json.loads(raw)
     return [str(v) for v in value] if isinstance(value, list) else None
+
+
+def _iso_day(epoch_seconds: int) -> str:
+    """A UTC calendar day, the only timezone the stored timestamps agree on."""
+    return datetime.fromtimestamp(epoch_seconds, tz=UTC).strftime("%Y-%m-%d")
+
+
+def _listing_filter(*, query_id: int | None, text: str) -> tuple[str, list[Any]]:
+    """The WHERE clause and parameters the listings browser filters on.
+
+    Shared by the count and the page so the two cannot disagree: a total taken from one
+    filter and rows from another is how "312 listings found" ends up above a grid of
+    three. Values always travel as bound parameters, so a search box holding a quote is
+    text to match rather than SQL to run.
+    """
+    where: list[str] = []
+    params: list[Any] = []
+    if query_id is not None:
+        where.append("i.query_id = ?")
+        params.append(query_id)
+    needle = text.strip()
+    if needle:
+        # Title, brand and seller: the three things a person actually looks for in a
+        # listing.
+        where.append("(i.title LIKE ? OR i.brand LIKE ? OR i.seller_login LIKE ?)")
+        params.extend([f"%{needle}%"] * 3)
+    return (f" WHERE {' AND '.join(where)}" if where else ""), params
 
 
 class Repo:
@@ -151,6 +229,34 @@ class Repo:
         await self._db.execute(
             "UPDATE queries SET paused = ?, updated_at = ? WHERE id = ?",
             (int(paused), int(time.time()), query_id),
+        )
+
+    async def update_query(
+        self,
+        query_id: int,
+        *,
+        name: str,
+        poll_interval_s: int,
+        banned_keywords: list[str] | None = None,
+        max_total_price: Decimal | None = None,
+    ) -> None:
+        """Edit a saved search.
+
+        Deliberately not the URL or the parameters: those describe what is being
+        watched, and changing them underneath a running poller would quietly turn
+        one search into another. Replace it for that.
+        """
+        await self._db.execute(
+            "UPDATE queries SET name = ?, poll_interval_s = ?, banned_keywords_json = ?, "
+            "max_total_price = ?, updated_at = ? WHERE id = ?",
+            (
+                name,
+                poll_interval_s,
+                json.dumps(banned_keywords or []),
+                float(max_total_price) if max_total_price is not None else None,
+                int(time.time()),
+                query_id,
+            ),
         )
 
     async def delete_query(self, query_id: int) -> None:
@@ -292,6 +398,28 @@ class Repo:
             (f"destination disabled: {reason[:200]}", destination_id),
         )
 
+    async def reactivate_destination(self, destination_id: int) -> None:
+        """Turn a destination back on after the user has fixed whatever broke it.
+
+        The destination was switched off automatically because the far end said the
+        target was gone, and only the user knows whether that is still true. Cancelled
+        notifications stay cancelled: the listing they were about was real, but
+        re-announcing everything from a backlog is exactly what a quiet return should
+        not do.
+        """
+        await self._db.execute(
+            "UPDATE destinations SET active = 1, deactivated_reason = NULL, "
+            "failure_count = 0 WHERE id = ?",
+            (destination_id,),
+        )
+
+    async def set_destination_notify_status(self, destination_id: int, enabled: bool) -> None:
+        """Whether this destination also gets operational notices (warnings, restarts)."""
+        await self._db.execute(
+            "UPDATE destinations SET notify_status = ? WHERE id = ?",
+            (int(enabled), destination_id),
+        )
+
     async def note_destination_failure(self, destination_id: int) -> None:
         await self._db.execute(
             "UPDATE destinations SET failure_count = failure_count + 1 WHERE id = ?",
@@ -313,6 +441,7 @@ class Repo:
             active=bool(row["active"]),
             notify_status=bool(row["notify_status"]),
             failure_count=row["failure_count"],
+            deactivated_reason=row["deactivated_reason"],
         )
 
     # --- Routing -------------------------------------------------------------------
@@ -441,6 +570,190 @@ class Repo:
             (limit,),
         )
 
+    # --- The found-listings browser -------------------------------------------------
+
+    async def listing_count(self, *, query_id: int | None = None, text: str = "") -> int:
+        """How many listings match a filter, without fetching any of them.
+
+        Needed before the page query so the page number can be clamped to what actually
+        exists — otherwise a stale "?page=99" renders an empty grid with no explanation.
+        """
+        return await self._count_matching(query_id=query_id, text=text)
+
+    async def listing_page(
+        self,
+        *,
+        page: int = 1,
+        per_page: int = 24,
+        query_id: int | None = None,
+        text: str = "",
+    ) -> tuple[list[aiosqlite.Row], int]:
+        """One page of found listings, newest first, plus how many there are in total.
+
+        Paged in SQL rather than by slicing a big fetch. A busy week puts tens of
+        thousands of rows in here, and a search that used to find ten a day is exactly
+        the case where scrolling forever to reach something is not acceptable.
+
+        The count is a second query rather than `len(rows)` because the whole point of
+        paging is that the rows are not all there; a count that came from the page would
+        report "24 results" and hide the fact that there are four hundred.
+        """
+        clause, params = _listing_filter(query_id=query_id, text=text)
+        total = int(
+            await self._db.fetch_value(f"SELECT COUNT(*) FROM items i{clause}", params) or 0
+        )
+        offset = (max(page, 1) - 1) * per_page
+        rows = await self._db.fetch_all(
+            "SELECT i.*, q.name AS query_name FROM items i "
+            "LEFT JOIN queries q ON q.id = i.query_id"
+            # item_id is the primary key, so it alone is a total order. Listings
+            # recorded in the same second share a timestamp, and without the tiebreak
+            # their order shifts between requests: one appears on two pages, or on none.
+            f"{clause} ORDER BY i.first_seen_at DESC, i.item_id DESC LIMIT ? OFFSET ?",
+            [*params, per_page, offset],
+        )
+        return rows, total
+
+    async def _count_matching(self, *, query_id: int | None, text: str) -> int:
+        clause, params = _listing_filter(query_id=query_id, text=text)
+        return int(await self._db.fetch_value(f"SELECT COUNT(*) FROM items i{clause}", params) or 0)
+
+    async def listing_counts_by_query(self) -> dict[int, int]:
+        """How many listings each search has produced, for the filter's labels."""
+        rows = await self._db.fetch_all(
+            "SELECT query_id, COUNT(*) AS n FROM items GROUP BY query_id"
+        )
+        return {int(row["query_id"]): int(row["n"]) for row in rows if row["query_id"] is not None}
+
+    async def destination_delivery_stats(self, window_days: int = 7) -> dict[int, DeliveryStats]:
+        """How each destination has been behaving lately, for the notifications page.
+
+        `sent_at - created_at` is the whole journey, not just the HTTP call: it includes
+        the time the notification sat in the queue. That is the number a person actually
+        feels — "my alert took nine minutes" — and it is the one that goes wrong when the
+        queue is backing up, which the sender's own timing would look perfectly fine
+        during.
+
+        A median rather than a mean, because one 429 retry stretch would otherwise paint
+        every normal send as slow. A destination with nothing sent in the window gets
+        zeros, not a division by zero.
+        """
+        cutoff = int(time.time()) - window_days * 86_400
+        rows = await self._db.fetch_all(
+            "SELECT destination_id, "
+            "COUNT(*) AS total, "
+            "SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) AS sent, "
+            "SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed, "
+            "AVG(CASE WHEN status = 'sent' THEN sent_at - created_at END) AS mean_latency, "
+            "MAX(created_at) AS last_queued_at "
+            "FROM outbox WHERE created_at >= ? GROUP BY destination_id",
+            (cutoff,),
+        )
+        stats: dict[int, DeliveryStats] = {}
+        for row in rows:
+            destination_id = int(row["destination_id"])
+            # The median needs its own query: SQLite has no MEDIAN, and averaging the two
+            # middle rows here would mean pulling every latency back into Python.
+            latencies = [
+                int(latency_row["latency"])
+                for latency_row in await self._db.fetch_all(
+                    "SELECT sent_at - created_at AS latency FROM outbox "
+                    "WHERE destination_id = ? AND status = 'sent' AND sent_at IS NOT NULL "
+                    "AND created_at >= ? ORDER BY latency",
+                    (destination_id, cutoff),
+                )
+            ]
+            stats[destination_id] = DeliveryStats(
+                destination_id=destination_id,
+                total=int(row["total"] or 0),
+                sent=int(row["sent"] or 0),
+                failed=int(row["failed"] or 0),
+                mean_latency_s=row["mean_latency"],
+                median_latency_s=float(latencies[len(latencies) // 2]) if latencies else None,
+                last_queued_at=row["last_queued_at"],
+            )
+        return stats
+
+    # --- Activity ------------------------------------------------------------------
+
+    async def search_counts(self) -> dict[str, int]:
+        """How many searches exist and how many are currently running."""
+        rows = await self._db.fetch_all("SELECT paused, COUNT(*) AS n FROM queries GROUP BY paused")
+        counts = {"total": 0, "active": 0, "paused": 0}
+        for row in rows:
+            total = int(row["n"])
+            counts["total"] += total
+            counts["paused" if row["paused"] else "active"] += total
+        return counts
+
+    async def outbox_status_counts(self) -> dict[str, int]:
+        """How the queue is doing, by outcome. Everything the app knows about delivery."""
+        rows = await self._db.fetch_all("SELECT status, COUNT(*) AS n FROM outbox GROUP BY status")
+        counts = {"pending": 0, "sending": 0, "sent": 0, "failed": 0, "cancelled": 0}
+        for row in rows:
+            counts[str(row["status"])] = int(row["n"])
+        return counts
+
+    async def listings_per_day(self, days: int = 14) -> list[tuple[str, int]]:
+        """Listings first seen per day, oldest first, with empty days filled in.
+
+        The days with nothing are kept because a gap is the thing worth seeing: a
+        search that used to find ten a day and now finds none is a quiet failure, and
+        a bar chart with the zeros removed would hide it.
+        """
+        start_of_today = int(time.time()) - (int(time.time()) % 86_400)
+        first_day = start_of_today - (days - 1) * 86_400
+        rows = await self._db.fetch_all(
+            "SELECT first_seen_at, COUNT(*) AS n FROM items "
+            "WHERE first_seen_at >= ? GROUP BY first_seen_at / 86400",
+            (first_day,),
+        )
+        by_day = {int(row["first_seen_at"]) // 86_400: int(row["n"]) for row in rows}
+
+        series = []
+        for offset in range(days):
+            day = first_day + offset * 86_400
+            series.append((_iso_day(day), by_day.get(day // 86_400, 0)))
+        return series
+
+    async def notifications_per_day(self, days: int = 14) -> list[tuple[str, int]]:
+        """Notifications actually delivered per day, for the same window."""
+        start_of_today = int(time.time()) - (int(time.time()) % 86_400)
+        first_day = start_of_today - (days - 1) * 86_400
+        rows = await self._db.fetch_all(
+            "SELECT sent_at, COUNT(*) AS n FROM outbox "
+            "WHERE status = 'sent' AND sent_at >= ? GROUP BY sent_at / 86400",
+            (first_day,),
+        )
+        by_day = {int(row["sent_at"]) // 86_400: int(row["n"]) for row in rows}
+
+        series = []
+        for offset in range(days):
+            day = first_day + offset * 86_400
+            series.append((_iso_day(day), by_day.get(day // 86_400, 0)))
+        return series
+
+    async def items_since(self, since: int) -> int:
+        value = await self._db.fetch_value(
+            "SELECT COUNT(*) FROM items WHERE first_seen_at >= ?", (since,)
+        )
+        return int(value or 0)
+
+    async def last_success_at(self) -> int | None:
+        """The most recent successful check across every search, or None if never."""
+        value = await self._db.fetch_value("SELECT MAX(last_success_at) FROM query_state")
+        return int(value) if value is not None else None
+
+    async def recent_failures(self, limit: int = 8) -> list[aiosqlite.Row]:
+        """The most recent checks that failed, joined to the search that made them."""
+        return await self._db.fetch_all(
+            "SELECT s.last_status, s.last_error, s.last_polled_at, q.name AS query_name, "
+            "q.tld FROM query_state s JOIN queries q ON q.id = s.query_id "
+            "WHERE s.last_status IS NOT NULL AND s.last_status != 'ok' "
+            "ORDER BY s.last_polled_at DESC LIMIT ?",
+            (limit,),
+        )
+
     # --- Outbox delivery -----------------------------------------------------------
 
     async def destinations_with_work(self) -> list[int]:
@@ -558,6 +871,23 @@ class Repo:
         """
         return await self._db.execute(
             "UPDATE outbox SET status = 'pending', lease_expires_at = NULL WHERE status = 'sending'"
+        )
+
+    async def recover_expired_leases(self) -> int:
+        """Return notifications whose lease ran out to the queue, mid-run.
+
+        A claim marks rows `sending` for a fixed time. The lease is the only record that
+        a send was ever in flight, so when a sender fails in a way the dispatcher cannot
+        attribute to a specific row — or the process is killed — the rows are stranded:
+        still `sending`, with nobody holding them, invisible to `destinations_with_work`
+        and therefore never retried. Startup recovery catches the killed-process case
+        because the process obviously did not start; this catches everything after it.
+        """
+        return await self._db.execute(
+            "UPDATE outbox SET status = 'pending', lease_expires_at = NULL "
+            "WHERE status = 'sending' AND lease_expires_at IS NOT NULL "
+            "AND lease_expires_at <= ?",
+            (int(time.time()),),
         )
 
     async def expire_stale_notifications(self, older_than_minutes: int) -> int:

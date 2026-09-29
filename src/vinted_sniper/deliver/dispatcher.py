@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import time
 from typing import Any
 
 import httpx
@@ -42,6 +43,11 @@ MAX_RETRY_DELAY_S = 5.0
 # Telegram counts messages across the whole bot, not per chat, so every Telegram
 # destination shares this.
 TELEGRAM_GLOBAL_PER_S = 25.0
+
+# How often to return notifications stranded by an expired lease. A lease lasts far
+# longer than this, so a sweep never disturbs a send that is still legitimately in
+# flight; it only rescues rows that were never going to be finished.
+LEASE_SWEEP_INTERVAL_S = 30.0
 
 
 def _awaiting_pairing(destination: Destination) -> bool:
@@ -71,9 +77,16 @@ class Dispatcher:
         self._signatures: dict[int, str] = {}
         self._discord_gate = Gate()
         self._telegram_budget = TokenBucket(TELEGRAM_GLOBAL_PER_S, capacity=TELEGRAM_GLOBAL_PER_S)
+        self._last_lease_sweep = 0.0
 
     async def run(self, idle_interval_s: float = 2.0) -> None:
         """Deliver whatever is queued, then wait to be told there is more."""
+        try:
+            await self._cycle(idle_interval_s)
+        finally:
+            await self.aclose()
+
+    async def _cycle(self, idle_interval_s: float) -> None:
         recovered = await self._repo.recover_leases()
         if recovered:
             log.info("outbox.recovered", count=recovered)
@@ -88,13 +101,13 @@ class Dispatcher:
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(self._work.wait(), timeout=idle_interval_s)
 
-        await self.aclose()
-
     async def drain(self) -> int:
         """Send everything currently due. Returns how many notifications went out."""
         expired = await self._repo.expire_stale_notifications(self._settings.outbox_expiry_minutes)
         if expired:
             log.info("outbox.expired", count=expired, reason="older than the delivery window")
+
+        await self._sweep_leases()
 
         destination_ids = await self._repo.destinations_with_work()
         if not destination_ids:
@@ -116,6 +129,22 @@ class Dispatcher:
                 continue
             sent += result
         return sent
+
+    async def _sweep_leases(self) -> None:
+        """Rescue notifications whose send was interrupted, without waiting for a restart.
+
+        Deliberately not per-destination and not on every cycle: a stranded row would
+        otherwise be invisible until something happened to touch that destination
+        again, which for a quiet search can be a long time.
+        """
+        now = time.monotonic()
+        if now - self._last_lease_sweep < LEASE_SWEEP_INTERVAL_S:
+            return
+        self._last_lease_sweep = now
+
+        recovered = await self._repo.recover_expired_leases()
+        if recovered:
+            log.warning("outbox.lease_expired", count=recovered, reason="send was interrupted")
 
     async def _serve(self, destination_id: int) -> int:
         destination = await self._repo.get_destination(destination_id)

@@ -181,10 +181,11 @@ class SessionManager:
     async def _save(self, session: Session) -> None:
         await self._db.execute(
             "INSERT INTO sessions (tld, cookies_json, user_agent, created_at, last_used_at, "
-            "request_count) VALUES (?, ?, ?, ?, ?, ?) "
+            "request_count, proxy) VALUES (?, ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(tld) DO UPDATE SET cookies_json = excluded.cookies_json, "
             "user_agent = excluded.user_agent, created_at = excluded.created_at, "
-            "last_used_at = excluded.last_used_at, request_count = excluded.request_count",
+            "last_used_at = excluded.last_used_at, request_count = excluded.request_count, "
+            "proxy = excluded.proxy",
             (
                 session.tld,
                 json.dumps(session.cookies),
@@ -192,12 +193,13 @@ class SessionManager:
                 session.created_at,
                 int(time.time()),
                 session.request_count,
+                session.proxy,
             ),
         )
 
     async def _load(self, tld: str) -> Session | None:
         row = await self._db.fetch_one(
-            "SELECT cookies_json, user_agent, created_at, request_count FROM sessions "
+            "SELECT cookies_json, user_agent, created_at, request_count, proxy FROM sessions "
             "WHERE tld = ?",
             (tld,),
         )
@@ -220,4 +222,8 @@ class SessionManager:
             identity=hdr.identity_for_user_agent(row["user_agent"]),
             created_at=int(row["created_at"]),
             request_count=int(row["request_count"]),
+            # The cookie comes back from the same route it was minted on. Without this
+            # the session would be replayed direct after a restart, which is the one
+            # thing the proxy is there to avoid.
+            proxy=row["proxy"] or None,
         )

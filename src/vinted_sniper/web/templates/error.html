@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>{{ status_code }} · vinted-sniper</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="centered-page">
+  <main class="notice-card">
+    <p class="notice-code">{{ status_code }}</p>
+    <h1>{{ message }}</h1>
+    <p class="hint">
+      {% if status_code == 403 %}
+        Pages hand out a one-time token so another site cannot post here on your behalf.
+        Reload the dashboard and try the action again.
+      {% elif status_code == 401 %}
+        This page needs the dashboard token before it will show anything.
+      {% else %}
+        Nothing was changed.
+      {% endif %}
+    </p>
+    <a class="btn btn-primary" href="/">Back to the dashboard</a>
+    {% if auth_enabled and status_code == 401 %}
+      <a class="btn btn-quiet" href="/login">Sign in</a>
+    {% endif %}
+  </main>
+</body>
+</html>

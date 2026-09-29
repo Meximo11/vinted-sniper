@@ -22,20 +22,22 @@ import json
 import secrets
 import time
 from collections import Counter
-from collections.abc import Iterator
+from collections.abc import Awaitable, Callable, Iterator
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Annotated, Any
+from urllib.parse import quote
 from xml.sax.saxutils import escape as xml_escape
 
 import uvicorn
 from fastapi import Cookie, Depends, FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import SecretStr
 
 from vinted_sniper.config import MIN_POLL_INTERVAL_S, Settings
-from vinted_sniper.db.repo import Repo
+from vinted_sniper.db.repo import DeliveryStats, Query, Repo
 from vinted_sniper.engine import health
 from vinted_sniper.log import get_logger
 from vinted_sniper.vinted import urls
@@ -45,7 +47,77 @@ from vinted_sniper.vinted.taxonomy import FACET_CODES, Taxonomy
 log = get_logger(__name__)
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+STATIC_DIR = Path(__file__).parent / "static"
 SESSION_COOKIE = "vinted_sniper_session"
+CSRF_COOKIE = "vinted_sniper_csrf"
+CSRF_FIELD = "csrf_token"
+# Forms are the normal way in, so the token travels as a field. Fetch/XHR callers send
+# the header instead: reading a response body from another origin is not something a
+# browser will let them do, so a header is the only channel they could use anyway.
+CSRF_HEADER = "x-csrf-token"
+# How long a browser may keep a token without asking for another. Same as the session.
+CSRF_MAX_AGE_S = 30 * 86_400
+# secrets.token_urlsafe(32) is 43 characters. Anything shorter is not ours.
+CSRF_MIN_LEN = 32
+
+# How many listings one page of the browser holds. 24 fills a wide grid twice over and
+# keeps a page's HTML small enough that the gallery thumbnails do not make it sluggish.
+LISTINGS_PER_PAGE = 24
+
+# What each destination kind is addressed by, and how much of it to show. A webhook URL
+# is a credential: anyone holding it can post to your channel, so the dashboard shows
+# enough to tell two of them apart and no more.
+_TARGET_KEYS = {
+    "discord": "webhook_url",
+    "telegram": "chat_id",
+    "ntfy": "topic",
+    "webhook": "url",
+}
+
+
+# Shorter than this and even a partly-shown address gives nothing away, so it is
+# hidden entirely rather than trimmed.
+_MASK_BELOW = 8
+# How much of a webhook address to show. Long enough to name the service and the bot,
+# short enough that the credential — which lives in the path — is never on screen.
+_MASK_HEAD = 28
+
+
+def _masked_target(config: dict[str, Any]) -> str:
+    """A destination's address, with the secret middle replaced."""
+    for key in ("webhook_url", "url", "chat_id", "topic"):
+        value = config.get(key)
+        if isinstance(value, str) and value:
+            if len(value) <= _MASK_BELOW:
+                return "•" * len(value)
+            if key in ("chat_id", "topic"):
+                return value
+            # Only the head. The tail of a Discord webhook URL is the token itself, and
+            # four characters of it are four characters less entropy for anyone reading
+            # over a shoulder or looking at a screen share.
+            return f"{value[:_MASK_HEAD]}…" if len(value) > _MASK_HEAD else value
+    if config.get("pairing_code"):
+        return f"pairing link · {config['pairing_code']}"
+    return "not configured"
+
+
+TEMPLATES.env.filters["masked_target"] = _masked_target
+
+
+def _csrf_ok(cookie: str | None, supplied: str | None) -> bool:
+    if not cookie or not supplied:
+        return False
+    return secrets.compare_digest(cookie, supplied)
+
+
+def _looks_like_csrf(token: str | None) -> bool:
+    """Whether a cookie already holds a token this app would have minted.
+
+    Anything shorter than what `secrets.token_urlsafe(32)` produces is somebody else's
+    cookie — an empty string from a browser that cleared it, or a value planted by
+    another site. Either way it is replaced rather than trusted.
+    """
+    return token is not None and len(token) >= CSRF_MIN_LEN
 
 
 def _authorised(supplied: str | None, expected: SecretStr | None) -> bool:
@@ -60,6 +132,10 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
     token = settings.web_auth_token  # None means no password: the dashboard just opens
 
     app = FastAPI(title="vinted-sniper", docs_url=None, redoc_url=None)
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+    # Templates ask for "how long ago" constantly, and always against the same instant,
+    # so the two are passed together rather than each view re-deriving the clock.
+    TEMPLATES.env.globals["_age"] = _age
 
     async def require_login(
         session: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
@@ -68,6 +144,68 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
             raise HTTPException(status_code=401, detail="not signed in")
 
     guard = Depends(require_login)
+
+    async def require_csrf(
+        request: Request,
+        submitted: Annotated[str | None, Form(alias=CSRF_FIELD)] = None,
+    ) -> None:
+        """Refuse a state change that did not come from a page we served.
+
+        The session cookie is what makes the browser attach itself to a request, and it
+        is attached whether or not the request came from this dashboard. Without this
+        check, any page the user visits could quietly pause a search or add a webhook of
+        its own by posting to localhost. The token proves the page was rendered here,
+        and only a page here can hand it out.
+        """
+        expected = request.cookies.get(CSRF_COOKIE)
+        supplied = submitted or request.headers.get(CSRF_HEADER)
+        if not _csrf_ok(expected, supplied):
+            raise HTTPException(
+                status_code=403, detail="this form has expired. Reload the page and try again."
+            )
+
+    # Declared after `guard` so an anonymous caller still gets a 401 telling it to sign
+    # in, rather than a 403 about a token it has never been shown.
+    csrf = Depends(require_csrf)
+
+    @app.middleware("http")
+    async def _issue_csrf_cookie(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        """Keep every browser holding a CSRF token, and put it where templates can see it.
+
+        Set before the route runs so a page rendered without one embeds the value that
+        is about to be written to the cookie, and written afterwards so a rejected POST
+        leaves the browser able to try again.
+        """
+        cookie = request.cookies.get(CSRF_COOKIE)
+        token = cookie if _looks_like_csrf(cookie) else None
+        fresh = token is None
+        request.state.csrf_token = token = token or secrets.token_urlsafe(32)
+        response = await call_next(request)
+        if fresh:
+            response.set_cookie(
+                CSRF_COOKIE,
+                token,
+                httponly=True,
+                samesite="lax",
+                max_age=CSRF_MAX_AGE_S,
+            )
+        return response
+
+    @app.exception_handler(HTTPException)
+    async def _html_errors(request: Request, exc: HTTPException) -> Response:
+        """A refused action gets a page, not a JSON blob: these URLs are typed by hand."""
+        accepts_html = "text/html" in request.headers.get("accept", "")
+        if not accepts_html:
+            return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+        message = str(exc.detail)
+        return TEMPLATES.TemplateResponse(
+            request,
+            "error.html",
+            {"message": message, "status_code": exc.status_code, "auth_enabled": token is not None},
+            status_code=exc.status_code,
+        )
 
     # --- Health, unauthenticated on purpose: the container check runs it ------------
 
@@ -85,6 +223,9 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
         return TEMPLATES.TemplateResponse(request, "login.html", {"error": None})
 
     @app.post("/login")
+    # Deliberately not behind `csrf`: signing in is the moment before there is anything
+    # to protect, and the value being posted is itself the secret. Forcing a victim to
+    # sign in only helps an attacker who already knows the token.
     async def login(request: Request, access_token: Annotated[str, Form()]) -> Response:
         if token is None:
             return RedirectResponse("/", status_code=303)
@@ -106,12 +247,27 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
         return response
 
     @app.post("/logout")
-    async def logout() -> Response:
+    async def logout(_: None = csrf) -> Response:
         response = RedirectResponse("/login", status_code=303)
         response.delete_cookie(SESSION_COOKIE)
         return response
 
     # --- Dashboard -----------------------------------------------------------------
+
+    async def _shell(request: Request, **context: Any) -> dict[str, Any]:
+        """The chrome every page shares, gathered in one place.
+
+        The sidebar shows the queue depth and the search counts, and the body shows
+        them again. Reading those from separate queries is how a page ends up
+        contradicting itself, so they are fetched once and passed down.
+        """
+        return {
+            "auth_enabled": token is not None,
+            "csrf_token": getattr(request.state, "csrf_token", ""),
+            "search_counts": await repo.search_counts(),
+            "active_destinations": sum(1 for d in await repo.list_destinations() if d.active),
+            **context,
+        }
 
     @app.get("/", response_class=HTMLResponse)
     async def dashboard(
@@ -121,27 +277,175 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
         if not _authorised(session, token):
             return RedirectResponse("/login", status_code=303)
 
+        now = int(time.time())
         snapshot = await health.snapshot(repo)
         destinations = await repo.list_destinations()
-        watched_tlds = [search.tld for search in snapshot.searches]
+        recent = _listing_views(await repo.recent_items(limit=24), now=now)
+
         return TEMPLATES.TemplateResponse(
             request,
             "dashboard.html",
-            {
-                "snapshot": snapshot,
-                "destinations": destinations,
-                "auth_enabled": token is not None,
-                "recent": _listing_views(await repo.recent_items(limit=25), now=int(time.time())),
-                "now": int(time.time()),
-                "min_interval": MIN_POLL_INTERVAL_S,
-                "default_interval": settings.poll_default_interval_s,
-                "builder_enabled": taxonomy is not None,
-                "known_tlds": sorted(urls.KNOWN_TLDS),
-                # Open the builder on the site the user already watches most.
-                "default_tld": (
-                    Counter(watched_tlds).most_common(1)[0][0] if watched_tlds else "fr"
-                ),
+            await _shell(
+                request,
+                nav="dashboard",
+                now=now,
+                snapshot=snapshot,
+                destinations=destinations,
+                recent=recent,
+                recent_failures=await repo.recent_failures(),
+                destinations_off=[d for d in destinations if not d.active],
+                unhealthy=sum(1 for s in snapshot.searches if s.state in ("failing", "stale")),
+                **_form_context(settings, snapshot, taxonomy),
+            )
+            | {
+                "found_today": await repo.items_since(now - 86_400),
+                "found_week": await repo.items_since(now - 7 * 86_400),
+                "outbox": await repo.outbox_status_counts(),
+                "search_counts": await repo.search_counts(),
+                "last_success_at": await repo.last_success_at(),
             },
+        )
+
+    @app.get("/searches", response_class=HTMLResponse)
+    async def searches_page(
+        request: Request,
+        session: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
+    ) -> Response:
+        if not _authorised(session, token):
+            return RedirectResponse("/login", status_code=303)
+
+        now = int(time.time())
+        snapshot = await health.snapshot(repo)
+        queries = await repo.list_queries()
+        destinations = await repo.list_destinations()
+
+        details: dict[int, Query] = {}
+        routes: dict[int, list[int]] = {}
+        for query in queries:
+            details[query.id] = query
+            routes[query.id] = await repo.destination_ids_for_query(query.id)
+
+        return TEMPLATES.TemplateResponse(
+            request,
+            "searches.html",
+            await _shell(
+                request,
+                nav="searches",
+                now=now,
+                snapshot=snapshot,
+                destinations=destinations,
+                search_counts=await repo.search_counts(),
+                **_form_context(settings, snapshot, taxonomy),
+            )
+            | {"details": details, "routes_by_query": routes},
+        )
+
+    @app.get("/destinations", response_class=HTMLResponse)
+    async def destinations_page(
+        request: Request,
+        session: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
+    ) -> Response:
+        if not _authorised(session, token):
+            return RedirectResponse("/login", status_code=303)
+
+        snapshot = await health.snapshot(repo)
+        destinations = await repo.list_destinations()
+        now = int(time.time())
+        stats = await repo.destination_delivery_stats()
+
+        return TEMPLATES.TemplateResponse(
+            request,
+            "destinations.html",
+            await _shell(
+                request,
+                nav="destinations",
+                now=now,
+                snapshot=snapshot,
+                destinations=destinations,
+                active_destinations=sum(1 for d in destinations if d.active),
+                delivery={
+                    d.id: _delivery_view(stats[d.id], now) for d in destinations if d.id in stats
+                },
+            ),
+        )
+
+    @app.get("/listings", response_class=HTMLResponse)
+    async def listings_page(
+        request: Request,
+        session: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
+        page: str = "1",
+        q: str = "",
+        search: int | None = None,
+    ) -> Response:
+        if not _authorised(session, token):
+            return RedirectResponse("/login", status_code=303)
+
+        now = int(time.time())
+        snapshot = await health.snapshot(repo)
+        queries = await repo.list_queries()
+
+        # A bad page number is a mistyped link, not an attack, so it falls back to the
+        # first page instead of answering a browser with a JSON validation error. The
+        # clamp has to happen before the query: asking for page 99 of a 2-page list and
+        # then discovering the ceiling would render an empty grid.
+        wanted = _positive_int(page)
+        ceiling = await repo.listing_count(query_id=search, text=q)
+        pages = max(1, -(-ceiling // LISTINGS_PER_PAGE))  # ceiling: 25 items, 2.1 pages
+        current = min(wanted, pages)
+        rows, total = await repo.listing_page(
+            page=current, per_page=LISTINGS_PER_PAGE, query_id=search, text=q
+        )
+
+        return TEMPLATES.TemplateResponse(
+            request,
+            "listings.html",
+            await _shell(
+                request,
+                nav="listings",
+                now=now,
+                snapshot=snapshot,
+                listings=_listing_views(rows, now=now),
+                total=total,
+                page=current,
+                pages=pages,
+                per_page=LISTINGS_PER_PAGE,
+                queries=queries,
+                counts=await repo.listing_counts_by_query(),
+                filter_query=search,
+                filter_text=q.strip(),
+            ),
+        )
+
+    @app.get("/activity", response_class=HTMLResponse)
+    async def activity_page(
+        request: Request,
+        session: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
+    ) -> Response:
+        if not _authorised(session, token):
+            return RedirectResponse("/login", status_code=303)
+
+        now = int(time.time())
+        snapshot = await health.snapshot(repo)
+        states = {state.query_id: state for state in await repo.all_states()}
+        outbox = await repo.outbox_status_counts()
+
+        return TEMPLATES.TemplateResponse(
+            request,
+            "activity.html",
+            await _shell(
+                request,
+                nav="activity",
+                now=now,
+                snapshot=snapshot,
+                outbox=outbox,
+                states=states,
+                recent_failures=await repo.recent_failures(),
+                found_today=await repo.items_since(now - 86_400),
+                found_week=await repo.items_since(now - 7 * 86_400),
+                sent_week=sum(count for _, count in await repo.notifications_per_day(7)),
+                listings_series=await repo.listings_per_day(),
+                sent_series=await repo.notifications_per_day(),
+            ),
         )
 
     @app.get("/api/health")
@@ -160,16 +464,17 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
         banned_keywords: Annotated[str, Form()] = "",
         destination_ids: Annotated[list[int] | None, Form()] = None,
         _: None = guard,
+        __: None = csrf,
     ) -> Response:
         try:
             normalised = urls.normalise_search_url(url)
             tld = urls.extract_tld(normalised)
             params = urls.parse_search_params(normalised)
         except urls.InvalidSearchURLError as exc:
-            return _redirect_with_error(str(exc))
+            return _redirect_with_error(str(exc), "/searches")
 
         if await repo.find_query_by_url(normalised) is not None:
-            return _redirect_with_error("that search is already being watched")
+            return _redirect_with_error("that search is already being watched", "/searches")
 
         query_id = await repo.add_query(
             name=name.strip() or _name_from(params, tld),
@@ -182,19 +487,59 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
         )
         for destination_id in destination_ids or []:
             await repo.route(query_id, destination_id)
-        return RedirectResponse("/", status_code=303)
+        return _redirect_with_ok(f"Now watching “{name.strip() or _name_from(params, tld)}”.")
+
+    @app.post("/searches/{query_id}/edit")
+    async def edit_search(
+        query_id: int,
+        name: Annotated[str, Form()],
+        interval: Annotated[int, Form()] = 0,
+        max_total_price: Annotated[str, Form()] = "",
+        banned_keywords: Annotated[str, Form()] = "",
+        destination_ids: Annotated[list[int] | None, Form()] = None,
+        _: None = guard,
+        __: None = csrf,
+    ) -> Response:
+        existing = await repo.get_query(query_id)
+        if existing is None:
+            return _redirect_with_error("that search no longer exists", "/searches")
+
+        clean_name = name.strip() or existing.name
+        await repo.update_query(
+            query_id,
+            name=clean_name,
+            poll_interval_s=max(interval or existing.poll_interval_s, MIN_POLL_INTERVAL_S),
+            banned_keywords=[w.strip() for w in banned_keywords.split(",") if w.strip()],
+            max_total_price=_decimal_or_none(max_total_price),
+        )
+
+        # Routing is replaced wholesale, which is what the checkbox list means: the
+        # boxes the user left unticked are the ones that should stop.
+        wanted = set(destination_ids or [])
+        for destination_id in set(await repo.destination_ids_for_query(query_id)) - wanted:
+            await repo.unroute(query_id, destination_id)
+        for destination_id in wanted:
+            await repo.route(query_id, destination_id)
+
+        return _redirect_with_ok(f"Saved “{clean_name}”.", "/searches")
 
     @app.post("/searches/{query_id}/pause")
     async def pause_search(
-        query_id: int, paused: Annotated[str, Form()], _: None = guard
+        query_id: int, paused: Annotated[str, Form()], _: None = guard, __: None = csrf
     ) -> Response:
         await repo.set_paused(query_id, paused == "1")
-        return RedirectResponse("/", status_code=303)
+        existing = await repo.get_query(query_id)
+        verb = "Resumed" if paused == "0" else "Paused"
+        name_of = existing.name if existing else "search"
+        return _redirect_with_ok(f"{verb} “{name_of}”.", "/searches")
 
     @app.post("/searches/{query_id}/delete")
-    async def delete_search(query_id: int, _: None = guard) -> Response:
+    async def delete_search(query_id: int, _: None = guard, __: None = csrf) -> Response:
+        existing = await repo.get_query(query_id)
         await repo.delete_query(query_id)
-        return RedirectResponse("/", status_code=303)
+        return _redirect_with_ok(
+            f"Stopped watching “{existing.name if existing else 'search'}”.", "/searches"
+        )
 
     # --- Filter data for the advanced search builder -------------------------------
     # Thin JSON pass-throughs the dashboard's picker calls. The taxonomy service does
@@ -254,6 +599,7 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
         name: Annotated[str, Form()] = "",
         target: Annotated[str, Form()] = "",
         _: None = guard,
+        __: None = csrf,
     ) -> Response:
         target = target.strip()
         config: dict[str, Any]
@@ -279,23 +625,47 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
         return RedirectResponse("/", status_code=303)
 
     @app.post("/destinations/{destination_id}/delete")
-    async def delete_destination(destination_id: int, _: None = guard) -> Response:
+    async def delete_destination(destination_id: int, _: None = guard, __: None = csrf) -> Response:
+        existing = await repo.get_destination(destination_id)
         await repo.deactivate_destination(destination_id, "removed from the dashboard")
-        return RedirectResponse("/", status_code=303)
+        return _redirect_with_ok(
+            f"Removed “{existing.name if existing else 'destination'}”.", "/destinations"
+        )
+
+    @app.post("/destinations/{destination_id}/reactivate")
+    async def reactivate_destination(
+        destination_id: int, _: None = guard, __: None = csrf
+    ) -> Response:
+        await repo.reactivate_destination(destination_id)
+        return _redirect_with_ok(
+            "Reconnected. It will start receiving matches again.", "/destinations"
+        )
+
+    @app.post("/destinations/{destination_id}/notify-status")
+    async def set_notify_status(
+        destination_id: int,
+        notify_status: Annotated[str, Form()],
+        _: None = guard,
+        __: None = csrf,
+    ) -> Response:
+        await repo.set_destination_notify_status(destination_id, notify_status == "1")
+        verb = "will get" if notify_status == "1" else "will no longer get"
+        return _redirect_with_ok(f"{verb} operational notices.", "/destinations")
 
     @app.post("/searches/{query_id}/routes")
     async def set_routes(
         query_id: int,
         destination_ids: Annotated[list[int] | None, Form()] = None,
         _: None = guard,
+        __: None = csrf,
     ) -> Response:
         wanted = set(destination_ids or [])
         current = set(await repo.destination_ids_for_query(query_id))
         for destination_id in current - wanted:
             await repo.unroute(query_id, destination_id)
-        for destination_id in wanted - current:
+        for destination_id in wanted:
             await repo.route(query_id, destination_id)
-        return RedirectResponse("/", status_code=303)
+        return _redirect_with_ok("Routing updated.", "/searches")
 
     # --- RSS -----------------------------------------------------------------------
 
@@ -313,8 +683,51 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
     return app
 
 
-def _redirect_with_error(message: str) -> RedirectResponse:
-    return RedirectResponse(f"/?error={message}", status_code=303)
+def _form_context(
+    settings: Settings, snapshot: health.Snapshot, taxonomy: Taxonomy | None
+) -> dict[str, Any]:
+    """What the add-a-search form needs, whichever page it is sitting on."""
+    watched_tlds = [search.tld for search in snapshot.searches]
+    return {
+        "min_interval": MIN_POLL_INTERVAL_S,
+        "default_interval": settings.poll_default_interval_s,
+        "builder_enabled": taxonomy is not None,
+        "known_tlds": sorted(urls.KNOWN_TLDS),
+        # Open the builder on the site the user already watches most.
+        "default_tld": Counter(watched_tlds).most_common(1)[0][0] if watched_tlds else "fr",
+    }
+
+
+def _redirect_with_error(message: str, to: str = "/") -> RedirectResponse:
+    return RedirectResponse(f"{to}?error={quote(message)}", status_code=303)
+
+
+def _redirect_with_ok(message: str, to: str = "/") -> RedirectResponse:
+    return RedirectResponse(f"{to}?ok={quote(message)}", status_code=303)
+
+
+def _delivery_view(stats: DeliveryStats, now: int) -> dict[str, Any]:
+    """One destination's delivery record, phrased for the card.
+
+    The latency shown is the median, and it is labelled as a wait rather than a speed:
+    what a person wants to know is whether an alert turns up promptly, and a bare
+    "0.8s" invites them to read it as the far end's response time when it is mostly
+    queue time.
+    """
+    latency = stats.median_latency_s
+    return {
+        "health": stats.health,
+        "sent": stats.sent,
+        "failed": stats.failed,
+        "success_rate": stats.success_rate,
+        "latency": f"{latency:.1f}s" if latency is not None else None,
+        "last_sent": _age(
+            stats.last_queued_at if stats.sent else None,
+            now,
+        )
+        if stats.sent
+        else None,
+    }
 
 
 def _listing_views(rows: list[Any], now: int) -> list[dict[str, Any]]:
@@ -359,15 +772,17 @@ def _listing_views(rows: list[Any], now: int) -> list[dict[str, Any]]:
                 "seller_feedback_count": row["seller_feedback_count"],
                 "favourite_count": row["favourite_count"] or 0,
                 "query_name": row["query_name"],
-                "age": _age(now - row["first_seen_at"]),
+                "age": _age(row["first_seen_at"], now),
             }
         )
     return views
 
 
-def _age(seconds: int) -> str:
+def _age(then: int | None, now: int) -> str:
     """A found-time a human scans, not arithmetic they have to do."""
-    seconds = max(seconds, 0)
+    if then is None:
+        return "never"
+    seconds = max(now - then, 0)
     if seconds < 60:  # noqa: PLR2004
         return f"{seconds}s ago"
     if seconds < 3600:  # noqa: PLR2004
@@ -375,6 +790,18 @@ def _age(seconds: int) -> str:
     if seconds < 86400:  # noqa: PLR2004
         return f"{seconds // 3600}h ago"
     return f"{seconds // 86400}d ago"
+
+
+def _positive_int(raw: str) -> int:
+    """A page number from a URL, or 1 when it is anything else.
+
+    Hand-edited links and crawler noise produce "?page=banana" constantly, and a
+    dashboard that answers that with a stack-trace-shaped JSON blob looks broken.
+    """
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return 1
 
 
 def _id_list(raw: str) -> str:

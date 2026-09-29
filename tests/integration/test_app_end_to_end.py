@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 import pytest
@@ -69,6 +70,9 @@ def offline_settings(tmp_path: Path) -> Settings:
         # No dashboard here: these tests are about the polling loop, and binding a real
         # port would make them fail whenever anything else is using it.
         web_enabled=False,
+        # Stated rather than inherited: a shell with a bot token exported would make the
+        # app start the real Telegram bot, and these tests would reach the network.
+        telegram_bot_token=None,
     )
 
 
@@ -78,6 +82,22 @@ async def run_briefly(app: Application, seconds: float = 0.6) -> None:
     await asyncio.sleep(seconds)
     app.request_stop()
     await asyncio.wait_for(task, timeout=5)
+
+
+async def wait_for(predicate: Callable[[], Awaitable[bool]], *, limit_s: float = 10.0) -> bool:
+    """Wait for something the app does on its own schedule.
+
+    Sleeping a fixed length and asserting is a coin flip once the suite runs slowly:
+    the supervisor, the session bootstrap and the first check all have to happen
+    inside the window. Polling for the actual outcome says the same thing without
+    the flakiness.
+    """
+    deadline = time.monotonic() + limit_s
+    while time.monotonic() < deadline:
+        if await predicate():
+            return True
+        await asyncio.sleep(0.05)
+    return False
 
 
 async def test_the_app_finds_listings_and_queues_them(offline_settings: Settings) -> None:
@@ -92,11 +112,27 @@ async def test_the_app_finds_listings_and_queues_them(offline_settings: Settings
             poll_interval_s=10,
         )
         destination_id = await repo.add_destination(
-            kind="webhook", name="sink", config={"url": "https://example.invalid/hook"}
+            kind="webhook",
+            name="sink",
+            # A closed local port rather than a reserved domain: some resolvers hijack
+            # the NXDOMAIN for .invalid and the dispatcher would open a real socket
+            # mid-test. This refuses instantly and stays offline.
+            config={"url": "http://127.0.0.1:9/hook"},
         )
         await repo.route(query_id, destination_id)
 
-    await run_briefly(Application(offline_settings))
+    app = Application(offline_settings)
+    task = asyncio.create_task(app.run())
+    try:
+
+        async def _polled() -> bool:
+            async with Database(offline_settings.db_path) as db:
+                return (await Repo(db).get_state(query_id)).last_success_at is not None
+
+        assert await wait_for(_polled), "the app never completed a check"
+    finally:
+        app.request_stop()
+        await asyncio.wait_for(task, timeout=5)
 
     async with Database(offline_settings.db_path) as db:
         repo = Repo(db)
@@ -140,8 +176,13 @@ async def test_a_search_added_while_running_is_picked_up(offline_settings: Setti
             poll_interval_s=10,
         )
 
-    # The supervisor reconciles on its own schedule; give it a moment to notice.
-    await asyncio.sleep(0.3)
+    # The supervisor reconciles on its own schedule; wait for it to notice.
+    async def _started() -> bool:
+        async with Database(offline_settings.db_path) as db:
+            return (await Repo(db).get_state(query_id)).last_polled_at is not None
+
+    assert await wait_for(_started), "a search added while running should start itself"
+
     app.request_stop()
     await asyncio.wait_for(task, timeout=5)
 

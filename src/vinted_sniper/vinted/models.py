@@ -153,7 +153,12 @@ def parse_item(payload: dict[str, Any], tld: str, *, keep_raw: bool = False) -> 
     if not isinstance(user, dict):
         user = {}
 
-    url = _first(payload, "url") or urls.item_url(tld, item_id)
+    raw_url = _first(payload, "url")
+    url = (
+        raw_url
+        if isinstance(raw_url, str) and raw_url.startswith(("http://", "https://"))
+        else urls.item_url(tld, item_id)
+    )
 
     return Item(
         item_id=item_id,

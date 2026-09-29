@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% import "_icons.html" as ui %}
+
+{% block title %}Activity · vinted-sniper{% endblock %}
+{% block heading %}Activity{% endblock %}
+
+{% macro chart(series, label) -%}
+{# Every day in the window is drawn, including the empty ones. A bar chart with the
+   zeros removed looks tidier and is worse: a search that used to find ten a day and now
+   finds none is the exact thing this page exists to make visible. #}
+<div class="chart" role="img" aria-label="{{ label }}">
+  {% for day, count in series %}
+  {% set peak = series | map(attribute=1) | max %}
+  <div class="bar-col" title="{{ day }}: {{ count }}">
+    <div class="bar {% if not count %}zero{% endif %}"
+         style="height: {{ (100 * count / peak) | round | int if peak and count else 3 }}%"></div>
+    <span class="bar-label">{{ day[5:] }}</span>
+  </div>
+  {% endfor %}
+</div>
+{%- endmacro %}
+
+{% block content %}
+
+<section aria-label="Totals">
+  <div class="section-head"><h2>Totals</h2></div>
+  <div class="stat-grid">
+    <div class="stat tone-accent">
+      <div class="label">{{ ui.icon("box") }} Listings found</div>
+      <div class="value">{{ found_today }}</div>
+      <div class="hint">{{ found_week }} in the last 7 days</div>
+    </div>
+    <div class="stat tone-ok">
+      <div class="label">{{ ui.icon("send") }} Notifications sent</div>
+      <div class="value">{{ outbox.sent }}</div>
+      <div class="hint">{{ sent_week }} in the last 7 days</div>
+    </div>
+    <div class="stat {% if outbox.failed %}tone-bad{% endif %}">
+      <div class="label">{{ ui.icon("alert") }} Failed</div>
+      <div class="value">{{ outbox.failed }}</div>
+      <div class="hint">gave up after 6 attempts</div>
+    </div>
+    <div class="stat">
+      <div class="label">{{ ui.icon("clock") }} Expired</div>
+      <div class="value">{{ outbox.cancelled }}</div>
+      <div class="hint">older than the delivery window</div>
+    </div>
+    <div class="stat">
+      <div class="label">{{ ui.icon("activity") }} Waiting</div>
+      <div class="value">{{ outbox.pending + outbox.sending }}</div>
+      <div class="hint">queued or in flight</div>
+    </div>
+  </div>
+</section>
+
+<section aria-label="Activity over time">
+  <div class="section-head">
+    <h2>Last 14 days</h2>
+  </div>
+  <div class="card card-pad chart-group">
+    <div>
+      <span class="chart-label">Listings found</span>
+      {{ chart(listings_series, "Listings found per day over the last 14 days") }}
+    </div>
+    <div>
+      <span class="chart-label">Notifications delivered</span>
+      {{ chart(sent_series, "Notifications delivered per day over the last 14 days") }}
+    </div>
+  </div>
+</section>
+
+<section aria-label="Per-search health">
+  <div class="section-head"><h2>Per search</h2></div>
+  {% if not snapshot.searches %}
+    <div class="card empty">
+      {{ ui.icon("search") }}
+      <h3>Nothing being watched</h3>
+      <p>Once a search is running, its totals and its health appear here.</p>
+    </div>
+  {% else %}
+  <div class="card table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Search</th><th>State</th><th>Seen</th><th>Blocks</th>
+          <th>Rate limits</th><th>Quiet checks</th><th>Last success</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for search in snapshot.searches %}
+        {% set detail = states.get(search.query_id) %}
+        <tr>
+          <td>
+            <div class="cell-title">{{ search.name }}</div>
+            <div class="cell-note">vinted.{{ search.tld }}</div>
+          </td>
+          <td><span class="pill {{ search.state }}">{{ search.state }}</span></td>
+          <td class="muted">{{ search.items_total }}</td>
+          <td class="muted">{{ search.blocks }}</td>
+          <td class="muted">{{ search.rate_limits }}</td>
+          <td class="muted">{{ search.checks_without_new_listings }}</td>
+          <td class="muted nowrap">
+            {% if search.last_success_at %}{{ _age(search.last_success_at, now) }}{% else %}never{% endif %}
+          </td>
+        </tr>
+        {% if detail and detail.last_error %}
+        <tr>
+          <td colspan="7" class="disclosure-row">
+            <div class="cell-note">
+              {{ detail.last_status }}: {{ detail.last_error }}
+            </div>
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+
+<section aria-label="Recent errors">
+  <div class="section-head"><h2>Recent errors</h2></div>
+  {% if not recent_failures %}
+    <div class="card empty">
+      {{ ui.icon("check") }}
+      <h3>No errors recorded</h3>
+      <p>Every check that has run since this database was created has either succeeded
+         or left no error behind.</p>
+    </div>
+  {% else %}
+  <div class="card table-wrap">
+    <table>
+      <thead><tr><th>When</th><th>Search</th><th>What happened</th></tr></thead>
+      <tbody>
+        {% for failure in recent_failures %}
+        <tr>
+          <td class="muted nowrap">{{ _age(failure.last_polled_at, now) }}</td>
+          <td class="cell-title">{{ failure.query_name }}</td>
+          <td>
+            <span class="pill failing plain">{{ failure.last_status }}</span>
+            <span class="cell-note">{{ failure.last_error }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+
+{% endblock %}

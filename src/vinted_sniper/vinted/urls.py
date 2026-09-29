@@ -144,7 +144,23 @@ def normalise_search_url(url: str) -> str:
 
 
 def catalog_endpoint(tld: str) -> str:
-    return f"https://www.vinted.{tld}/api/v2/catalog/items"
+    return f"https://api.vinted.{tld}/svc-catalogue/items"
+
+
+def catalog_endpoint_for(url: str) -> str | None:
+    """The site a URL's catalogue request belongs to, or None if it is not one.
+
+    Vinted has moved the catalogue API between hosts and paths before, and the places
+    that need to tell a catalogue request from a page load — the mock transport, the
+    test harness — would otherwise each hard-code today's spelling. Matching on the API
+    host and the catalogue path segment keeps them right when it moves again. The
+    `api/v2` form is still recognised so an older recorded scenario keeps working.
+    """
+    if not url.startswith("https://api.vinted."):
+        return None
+    if "/svc-catalogue/" in url or "/api/v2/catalog/items" in url:
+        return url
+    return None
 
 
 def brands_endpoint(tld: str) -> str:

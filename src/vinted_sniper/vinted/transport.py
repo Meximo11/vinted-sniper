@@ -18,6 +18,8 @@ from typing import Any, Protocol, Self, runtime_checkable
 
 import httpx
 
+from vinted_sniper.vinted import urls
+
 
 @dataclass(frozen=True, slots=True)
 class Response:
@@ -181,7 +183,9 @@ class MockTransport:
         follow_redirects: bool = True,
     ) -> Response:
         del headers, cookies, params, follow_redirects
-        name = "catalog" if "/api/v2/catalog/items" in url else "root"
+        # Matched on the endpoint's host and shape rather than one literal path, so a
+        # recorded scenario keeps answering when the catalogue API moves.
+        name = "catalog" if urls.catalog_endpoint_for(url) is not None else "root"
         path = self.scenario_dir / f"{name}.json"
         if not path.exists():
             raise TransportError(f"mock scenario has no {path.name} for {url}")

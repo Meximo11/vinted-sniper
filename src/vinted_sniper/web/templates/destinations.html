@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% import "_icons.html" as ui %}
+
+{% block title %}Notifications · vinted-sniper{% endblock %}
+{% block heading %}Notifications{% endblock %}
+
+{% macro kind_icon(kind) -%}
+  {%- if kind == "telegram" -%}{{ ui.icon("telegram") }}
+  {%- elif kind == "discord" -%}{{ ui.icon("discord") }}
+  {%- elif kind == "ntfy" -%}{{ ui.icon("ntfy") }}
+  {%- else -%}{{ ui.icon("webhook") }}{%- endif -%}
+{%- endmacro %}
+
+{% block content %}
+
+<section aria-label="Configured destinations">
+  <div class="section-head">
+    <h2>{{ destinations | length }} configured</h2>
+    <div class="spacer"></div>
+    <span class="muted">{{ active_destinations }} connected</span>
+  </div>
+
+  {% if not destinations %}
+    <div class="card empty">
+      {{ ui.icon("bell") }}
+      <h3>Nowhere to send matches yet</h3>
+      <p>Add a destination below. Until you do, listings are still found and stored, they
+         just have nowhere to go.</p>
+    </div>
+  {% else %}
+  <div class="dest-grid">
+    {% for destination in destinations %}
+    {% set stats = delivery.get(destination.id) %}
+    <article class="dest {% if not destination.active %}off{% endif %}">
+      <div class="dest-head">
+        <span class="dest-icon {{ destination.kind }}">{{ kind_icon(destination.kind) }}</span>
+        <div>
+          <h3>{{ destination.name }}</h3>
+          <div class="kind-label">{{ destination.kind }}</div>
+        </div>
+        {% if destination.is_awaiting_pairing %}
+          <span class="pill starting">waiting</span>
+        {% elif destination.active %}
+          <span class="pill ok">connected</span>
+        {% else %}
+          <span class="pill disabled">off</span>
+        {% endif %}
+      </div>
+
+      <div class="target">{{ destination.config | masked_target }}</div>
+
+      {% if not destination.active and destination.deactivated_reason %}
+      <div class="reason">{{ destination.deactivated_reason }}</div>
+      {% elif destination.is_awaiting_pairing %}
+      <p class="hint">
+        Waiting for someone to open the pairing link. Notifications queue until then and
+        expire on their own, so this is not an error.
+      </p>
+      {% endif %}
+
+      {% if destination.failure_count %}
+      <p class="hint text-warn">
+        {{ destination.failure_count }} failed send{{ 's' if destination.failure_count != 1 }} in a row.
+      </p>
+      {% endif %}
+
+      {% if stats and stats.sent %}
+      <dl class="delivery delivery-{{ stats.health }}">
+        <div>
+          <dt>Arrived</dt>
+          <dd>{{ stats.sent }}{% if stats.failed %} of {{ stats.sent + stats.failed }}{% endif %}</dd>
+        </div>
+        {% if stats.latency %}
+        <div>
+          <dt>Typical wait</dt>
+          <dd>{{ stats.latency }}</dd>
+        </div>
+        {% endif %}
+        {% if stats.last_sent %}
+        <div>
+          <dt>Last one</dt>
+          <dd>{{ stats.last_sent }}</dd>
+        </div>
+        {% endif %}
+      </dl>
+      {% elif stats and stats.failed %}
+      <p class="delivery-note">
+        {{ stats.failed }} notification{{ 's' if stats.failed != 1 }} could not be delivered
+        in the last 7 days.
+      </p>
+      {% endif %}
+
+      <div class="dest-foot">
+        {% if destination.active %}
+        <form method="post" action="/destinations/{{ destination.id }}/notify-status" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="notify_status" value="{{ '0' if destination.notify_status else '1' }}">
+          <button class="btn btn-quiet btn-sm" type="submit">
+            {{ ui.icon("info") }}<span>{{ 'Stop status notices' if destination.notify_status else 'Send status notices' }}</span>
+          </button>
+        </form>
+        <form method="post" action="/destinations/{{ destination.id }}/delete" class="inline"
+              data-confirm="Stop sending to “{{ destination.name }}”? Anything still queued for it is cancelled.">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="btn btn-danger btn-sm" type="submit">
+            {{ ui.icon("trash") }}<span>Remove</span>
+          </button>
+        </form>
+        {% else %}
+        <form method="post" action="/destinations/{{ destination.id }}/reactivate" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="btn btn-sm" type="submit">
+            {{ ui.icon("check") }}<span>Reconnect</span>
+          </button>
+        </form>
+        <form method="post" action="/destinations/{{ destination.id }}/delete" class="inline"
+              data-confirm="Remove “{{ destination.name }}” for good?">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="btn btn-danger btn-sm" type="submit">
+            {{ ui.icon("trash") }}<span>Remove</span>
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+
+  <p class="section-note">
+    Typical wait is the median time from a match being found to its notification arriving.
+    Most of it is queue time, not the far end thinking about it. A growing wait means the
+    queue is backing up. A falling success rate means the destination is refusing.
+  </p>
+  <p class="section-note">
+    A destination switches itself off when the far end says the target is gone: a deleted
+    webhook, or a chat that blocked the bot. Only you know whether that is still true, so
+    reconnecting is your call rather than something it retries at you.
+  </p>
+  {% endif %}
+</section>
+
+<section aria-label="Add a destination">
+  <div class="section-head">
+    <h2>Add a destination</h2>
+  </div>
+  <div class="card card-pad form-narrow">
+    <form method="post" action="/destinations">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="form-grid">
+        <div class="field">
+          <label for="kind">Type</label>
+          <select id="kind" name="kind">
+            <option value="discord">Discord webhook</option>
+            <option value="telegram">Telegram chat</option>
+            <option value="ntfy">ntfy topic</option>
+            <option value="webhook">Plain webhook</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="dest_name">Name</label>
+          <input type="text" id="dest_name" name="name" placeholder="my server">
+        </div>
+        <div class="field span-all">
+          <label for="target">Webhook URL, chat id, or topic</label>
+          <input type="text" id="target" name="target" required>
+          <p class="hint">
+            Discord: server settings, then Integrations, then Webhooks, then copy the URL.
+            Telegram: <code>vinted-sniper pair-telegram</code> prints a link that sets the
+            chat up for you. This box is the only place a stored webhook URL is ever shown.
+          </p>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Add destination</button>
+      </div>
+    </form>
+  </div>
+</section>
+
+{% endblock %}

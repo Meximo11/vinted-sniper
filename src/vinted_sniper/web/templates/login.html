@@ -1,18 +1,46 @@
-{% extends "base.html" %}
-{% block title %}Sign in · vinted-sniper{% endblock %}
-{% block content %}
-<section style="max-width: 24rem; margin: 3rem auto;">
-  <h2>Sign in</h2>
-  <div class="card">
-    {% if error %}<p class="error">{{ error }}</p>{% endif %}
-    <form method="post" action="/login">
-      <label for="access_token">Access token</label>
-      <input type="password" id="access_token" name="access_token" autofocus required>
-      <p class="muted" style="margin: .6rem 0 1rem;">
-        The value of <code>VINTED_SNIPER_WEB_AUTH_TOKEN</code>.
-      </p>
-      <button type="submit">Sign in</button>
+{% import "_icons.html" as ui %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Sign in · vinted-sniper</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+{# No app shell here. Every link in the sidebar would bounce straight back to this
+   page, which reads as a broken navigation rather than a locked one. #}
+<body class="centered-page">
+  <main class="notice-card">
+    <div class="brand brand-centered">
+      <span class="mark">{{ ui.icon("target") }}</span>
+      <span>vinted-sniper</span>
+    </div>
+
+    <h1>Sign in</h1>
+
+    {% if error %}
+    <div class="flash flash-error" role="alert">
+      {{ ui.icon("alert") }}<span>{{ error }}</span>
+    </div>
+    {% endif %}
+
+    <form method="post" action="/login" class="login-form">
+      <div class="field">
+        <label for="access_token">Access token</label>
+        <input type="password" id="access_token" name="access_token" autofocus
+               autocomplete="current-password" required>
+        <p class="hint">The value of <code class="mono">VINTED_SNIPER_WEB_AUTH_TOKEN</code>.</p>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Sign in</button>
+      </div>
     </form>
-  </div>
-</section>
-{% endblock %}
+
+    <p class="hint">
+      The dashboard holds your webhook URLs and chat ids, so it is worth a password
+      before it goes anywhere but your own machine.
+    </p>
+  </main>
+</body>
+</html>

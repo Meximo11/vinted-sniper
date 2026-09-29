@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% import "_icons.html" as ui %}
+
+{% block title %}Searches · vinted-sniper{% endblock %}
+{% block heading %}Searches{% endblock %}
+
+{% block content %}
+
+<section aria-label="Saved searches">
+  <div class="section-head">
+    <h2>{{ search_counts.total }} saved</h2>
+    <div class="spacer"></div>
+    <span class="muted">
+      {{ search_counts.active }} running, {{ search_counts.paused }} paused
+    </span>
+  </div>
+
+  {% if not snapshot.searches %}
+    <div class="card empty">
+      {{ ui.icon("search") }}
+      <h3>No searches yet</h3>
+      <p>Set up the search you want on Vinted, then paste the address bar into the box
+         below. Or use the builder and skip the URL entirely.</p>
+    </div>
+  {% else %}
+  <div class="card table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Search</th>
+          <th>State</th>
+          <th>Last poll</th>
+          <th>Newest</th>
+          <th>Found</th>
+          <th><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for search in snapshot.searches %}
+        {% set routes = routes_by_query.get(search.query_id, []) %}
+        <tr>
+          <td>
+            <div class="cell-title">{{ search.name }}</div>
+            <div class="cell-note">
+              vinted.{{ search.tld }}{% if routes %}, {{ routes | length }} destination{{ 's' if routes | length != 1 }}{% endif %}
+            </div>
+            {% if search.last_error %}
+            <div class="cell-note text-bad">{{ search.last_error[:90] }}</div>
+            {% endif %}
+          </td>
+          <td><span class="pill {{ search.state }}">{{ search.state }}</span></td>
+          <td class="muted nowrap">
+            {% if search.last_success_at %}{{ _age(search.last_success_at, now) }}{% else %}never{% endif %}
+          </td>
+          <td class="muted nowrap">
+            {% if search.newest_listing_at %}{{ _age(search.newest_listing_at, now) }}{% else %}none yet{% endif %}
+          </td>
+          <td class="muted">{{ search.items_total }}</td>
+          <td>
+            <div class="row-actions">
+              <button type="button" class="btn btn-quiet btn-sm"
+                      data-disclosure="edit-{{ search.query_id }}"
+                      aria-expanded="false" aria-controls="edit-{{ search.query_id }}">
+                {{ ui.icon("pencil") }}<span>Edit</span>
+              </button>
+              <form method="post" action="/searches/{{ search.query_id }}/pause" class="inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="paused" value="{{ '0' if search.paused else '1' }}">
+                <button class="btn btn-quiet btn-sm" type="submit">
+                  {% if search.paused %}{{ ui.icon("play") }}<span>Resume</span>
+                  {% else %}{{ ui.icon("pause") }}<span>Pause</span>{% endif %}
+                </button>
+              </form>
+              <form method="post" action="/searches/{{ search.query_id }}/delete" class="inline"
+                    data-confirm="Stop watching “{{ search.name }}”? The listings already found are kept, but anything still queued for it is cancelled.">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button class="btn btn-danger btn-sm" type="submit">
+                  {{ ui.icon("trash") }}<span>Delete</span>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        <tr id="edit-{{ search.query_id }}" class="disclosure-row" hidden>
+          <td colspan="6">
+            <div data-disclosure-panel>
+              <form method="post" action="/searches/{{ search.query_id }}/edit" class="card-pad">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="form-grid">
+                  <div class="field">
+                    <label for="name-{{ search.query_id }}">Name</label>
+                    <input type="text" id="name-{{ search.query_id }}" name="name"
+                           value="{{ search.name }}">
+                  </div>
+                  <div class="field">
+                    <label for="interval-{{ search.query_id }}">Check every (seconds)</label>
+                    <input type="text" id="interval-{{ search.query_id }}" name="interval"
+                           inputmode="numeric" value="{{ details[search.query_id].poll_interval_s }}">
+                    <p class="hint">Minimum 10s.</p>
+                  </div>
+                  <div class="field">
+                    <label for="price-{{ search.query_id }}">Max total price</label>
+                    <input type="text" id="price-{{ search.query_id }}" name="max_total_price"
+                           inputmode="decimal"
+                           value="{{ details[search.query_id].max_total_price or '' }}">
+                    <p class="hint">What you actually pay, buyer protection included.</p>
+                  </div>
+                  <div class="field">
+                    <label for="banned-{{ search.query_id }}">Exclude words</label>
+                    <input type="text" id="banned-{{ search.query_id }}" name="banned_keywords"
+                           value="{{ details[search.query_id].banned_keywords | join(', ') }}">
+                    <p class="hint">Comma separated.</p>
+                  </div>
+
+                  {% if destinations %}
+                  <div class="field span-all">
+                    <span class="label">Send matches to</span>
+                    <div class="check-grid">
+                      {% for destination in destinations %}
+                      <label class="check">
+                        <input type="checkbox" name="destination_ids" value="{{ destination.id }}"
+                               {% if destination.id in routes %}checked{% endif %}>
+                        {{ destination.name }}
+                        {% if not destination.active %}
+                        <span class="muted">(off)</span>
+                        {% endif %}
+                      </label>
+                      {% endfor %}
+                    </div>
+                  </div>
+                  {% endif %}
+                </div>
+
+                <p class="section-note">
+                  The search itself (site, terms and filters) comes from
+                  <a href="{{ details[search.query_id].url }}" target="_blank" rel="noreferrer">the Vinted URL</a>.
+                  To change what it looks for, delete this search and add a new one.
+                </p>
+
+                <div class="form-actions">
+                  <button type="submit" class="btn btn-primary btn-sm">Save changes</button>
+                </div>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="section-note">
+    A search goes stale when it stops seeing new listings while others on the same site
+    keep finding them. That is usually a session that needs replacing, which happens on its own.
+  </p>
+  {% endif %}
+</section>
+
+<section id="new" aria-label="Add a search">
+  <div class="section-head">
+    <h2>Add a search</h2>
+  </div>
+  <div class="card card-pad form-narrow">
+    {% include "_search_form.html" %}
+  </div>
+</section>
+
+{% endblock %}

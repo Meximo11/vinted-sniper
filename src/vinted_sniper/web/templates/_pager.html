@@ -1,0 +1,51 @@
+{% import "_icons.html" as ui %}
+
+{# Page links. `carried` holds the current filter so paging does not silently drop it —
+   the classic bug where you narrow a search, click next, and get the unfiltered list
+   from page two.
+
+   The visible range is computed here rather than in a helper macro because a Jinja macro
+   returns rendered text: handing one to `{% for %}` would walk its characters, one link
+   per digit. A namespace keeps the list as a real list. #}
+
+{% macro link(url, params, page, label, current, cls='btn btn-quiet btn-sm') -%}
+  {# Drop the empty ones rather than emitting "&q=", which is noise in the address bar
+     and in anything that copies it. #}
+  {%- set kept = {} -%}
+  {%- for key, value in (params or {}).items() -%}
+    {%- if value -%}{%- set _ = kept.update({key: value}) -%}{%- endif -%}
+  {%- endfor -%}
+  {%- set qs = kept | urlencode -%}
+  <a class="{{ cls }}{% if page == current %} is-current{% endif %}"
+     href="{{ url }}?page={{ page }}{% if qs %}&{{ qs }}{% endif %}"
+     {% if page == current %}aria-current="page"{% endif %}>{{ label }}</a>
+{%- endmacro %}
+
+
+{% macro pager(current, pages, url='/', carried={}) -%}
+{% if pages > 1 %}
+{% set span = 2 %}
+{% set ns = namespace(shown=[]) %}
+{% for n in range(1, pages + 1) %}
+  {# First page, last page, and a run either side of where you are: enough to reach
+     anywhere in a couple of clicks without one link per page. #}
+  {% if n == 1 or n == pages or (n >= current - span and n <= current + span) %}
+    {% if ns.shown and ns.shown[-1] != n - 1 %}
+      {% set _ = ns.shown.append('…') %}
+    {% endif %}
+    {% set _ = ns.shown.append(n) %}
+  {% endif %}
+{% endfor %}
+<nav class="pager" aria-label="Pagination">
+  {% if current > 1 %}{{ link(url, carried, current - 1, '‹ Previous', current) }}{% endif %}
+  {% for item in ns.shown %}
+    {% if item == '…' %}
+      <span class="gap" aria-hidden="true">…</span>
+    {% else %}
+      {{ link(url, carried, item, item, current) }}
+    {% endif %}
+  {% endfor %}
+  {% if current < pages %}{{ link(url, carried, current + 1, 'Next ›', current) }}{% endif %}
+</nav>
+{% endif %}
+{%- endmacro %}

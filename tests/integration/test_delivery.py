@@ -212,6 +212,9 @@ async def test_notifications_are_delivered_in_the_order_they_were_found(
 async def test_a_telegram_destination_without_a_token_is_reported_not_retried(
     repo: Repo, settings: Settings
 ) -> None:
+    # Stated rather than inherited: the settings fixture only ignores .env, so a shell
+    # with a real bot token exported would otherwise make this pass for the wrong reason.
+    without_token = settings.model_copy(update={"telegram_bot_token": None})
     query = await a_search(repo)
     destination_id = await repo.add_destination(
         kind="telegram", name="test", config={"chat_id": "123"}
@@ -219,7 +222,7 @@ async def test_a_telegram_destination_without_a_token_is_reported_not_retried(
     await repo.record_new_items(query, [listing(1)], [destination_id])
 
     endpoint = FakeEndpoint()
-    await make_dispatcher(repo, settings, endpoint).drain()
+    await make_dispatcher(repo, without_token, endpoint).drain()
 
     destination = await repo.get_destination(destination_id)
     assert destination is not None

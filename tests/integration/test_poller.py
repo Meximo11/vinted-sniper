@@ -357,3 +357,107 @@ async def test_server_errors_are_transient(
 
     assert delay > 0
     assert (await repo.get_state(poller.query.id)).last_status == "network"
+
+
+async def test_newest_mode_announces_one_listing_and_then_only_new_ones(
+    transport: ScriptedTransport,
+    repo: Repo,
+    settings: Settings,
+    db: Any,
+    make_item: Callable[..., dict[str, Any]],
+) -> None:
+    """The smoke test must stay a smoke test.
+
+    FIRST_RUN_MODE=newest promises one listing so you can see delivery works. If the
+    first check also announced anything else — or if later checks kept announcing from
+    the first page — the promise is worthless and the flood it exists to prevent is back.
+    """
+    poller, _ = await make_poller(
+        transport, repo, settings.model_copy(update={"first_run_mode": "newest"}), db=db
+    )
+    destination_id = await repo.add_destination(kind="webhook", name="test", config={"url": "x"})
+    await repo.route(poller.query.id, destination_id)
+
+    now = int(time.time())
+    transport.queue_catalog([make_item(i, photo_ts=now - i * 3600) for i in range(1, 31)])
+    await poller.tick()
+    assert await repo.outbox_depth() == 1, "the smoke test is exactly one notification"
+
+    # Second check, same page. Nothing here is new, so nothing should be announced.
+    transport.queue_catalog([make_item(i, photo_ts=now - i * 3600) for i in range(1, 31)])
+    await poller.tick()
+    assert await repo.outbox_depth() == 1, "the shelf must not be re-announced"
+
+
+async def test_a_search_that_fails_then_recovers_is_still_a_first_run(
+    transport: ScriptedTransport,
+    repo: Repo,
+    settings: Settings,
+    db: Any,
+    make_item: Callable[..., dict[str, Any]],
+) -> None:
+    """A first check that errored never seeded anything, so the next one is still the first.
+
+    is_first_run is derived from last_success_at, which a failure leaves alone. Getting
+    this wrong the other way would announce the whole catalog to someone whose first poll
+    was a 403.
+    """
+    poller, _ = await make_poller(
+        transport, repo, settings.model_copy(update={"first_run_mode": "newest"}), db=db
+    )
+    destination_id = await repo.add_destination(kind="webhook", name="test", config={"url": "x"})
+    await repo.route(poller.query.id, destination_id)
+
+    transport.queue_status(403, "blocked")
+    await poller.tick()
+
+    now = int(time.time())
+    transport.queue_catalog([make_item(i, photo_ts=now - i * 3600) for i in range(1, 6)])
+    await poller.tick()
+
+    queued = await repo.claim_batch(destination_id, 50)
+    assert [n.item.item_id for n in queued] == [1], "still the first successful check"
+
+
+async def test_a_search_added_while_the_app_runs_gets_its_own_smoke_test(
+    transport: ScriptedTransport,
+    repo: Repo,
+    settings: Settings,
+    db: Any,
+    make_item: Callable[..., dict[str, Any]],
+) -> None:
+    """Each search is first-run on its own terms, not once per process.
+
+    FIRST_RUN_MODE is a per-setting, but the seed is per-search: a search added to a
+    running app has never been seeded, so it gets its one listing like any other.
+    """
+    newest = settings.model_copy(update={"first_run_mode": "newest"})
+    first, _ = await make_poller(transport, repo, newest, db=db)
+    first_destination = await repo.add_destination(
+        kind="webhook", name="first", config={"url": "x"}
+    )
+    await repo.route(first.query.id, first_destination)
+
+    now = int(time.time())
+    transport.queue_catalog([make_item(i, photo_ts=now - i * 3600) for i in range(1, 4)])
+    await first.tick()
+
+    second_id = await repo.add_query(
+        name="second search",
+        url="https://www.vinted.fr/catalog?search_text=adidas",
+        tld="fr",
+        params={"search_text": "adidas", "order": "newest_first"},
+        poll_interval_s=60,
+    )
+    second_query = await repo.get_query(second_id)
+    assert second_query is not None
+    second, _ = poller_for(second_query, transport, repo, newest, db=db)
+    second_destination = await repo.add_destination(
+        kind="webhook", name="second", config={"url": "y"}
+    )
+    await repo.route(second.query.id, second_destination)
+    transport.queue_catalog([make_item(100 + i, photo_ts=now - i * 3600) for i in range(1, 4)])
+    await second.tick()
+
+    queued = await repo.claim_batch(second_destination, 50)
+    assert len(queued) == 1, "a new search gets its own smoke test"

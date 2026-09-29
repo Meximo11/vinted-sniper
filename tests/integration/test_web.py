@@ -7,7 +7,10 @@ it holds webhook URLs and chat ids — so "is it locked" is a correctness questi
 from __future__ import annotations
 
 import json
+import re
+import time
 from collections.abc import Callable, Iterator
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +26,13 @@ from vinted_sniper.vinted.models import parse_item
 from vinted_sniper.vinted.session import SessionManager
 from vinted_sniper.vinted.taxonomy import Taxonomy
 from vinted_sniper.vinted.transport import Response
-from vinted_sniper.web.server import SESSION_COOKIE, create_app
+from vinted_sniper.web.server import (
+    CSRF_COOKIE,
+    CSRF_HEADER,
+    SESSION_COOKIE,
+    _masked_target,
+    create_app,
+)
 
 TOKEN = "test-token-please-ignore"
 
@@ -44,8 +53,21 @@ def client(web_settings: Settings, repo: Repo) -> Iterator[TestClient]:
         yield test_client
 
 
+def _arm_csrf(client: TestClient) -> TestClient:
+    """Do what a browser does: load a page, then keep its token for later posts.
+
+    The token is sent as a header rather than a form field, which is the channel a
+    script uses; the field in every template is the same value and is covered by its
+    own test below.
+    """
+    client.get("/login")
+    client.headers[CSRF_HEADER] = client.cookies.get(CSRF_COOKIE) or ""
+    return client
+
+
 @pytest.fixture
 def signed_in(client: TestClient) -> TestClient:
+    _arm_csrf(client)
     client.cookies.set(SESSION_COOKIE, TOKEN)
     return client
 
@@ -103,6 +125,7 @@ def test_without_a_token_the_dashboard_is_open(tmp_path: Path, repo: Repo) -> No
     settings = Settings(_env_file=None, db_path=tmp_path / "a.db", web_enabled=True)  # type: ignore[call-arg]
 
     with TestClient(create_app(settings, repo)) as client:
+        _arm_csrf(client)
         assert client.get("/", follow_redirects=False).status_code == 200
         assert client.get("/api/health").status_code == 200
         # The sign-in page has nothing to ask for, so it sends you to the dashboard.
@@ -113,6 +136,7 @@ async def test_without_a_token_the_feed_needs_no_key(tmp_path: Path, repo: Repo)
     settings = Settings(_env_file=None, db_path=tmp_path / "b.db", web_enabled=True)  # type: ignore[call-arg]
 
     with TestClient(create_app(settings, repo)) as client:
+        _arm_csrf(client)
         client.post(
             "/searches",
             data={"url": "https://www.vinted.fr/catalog?search_text=nike"},
@@ -293,6 +317,7 @@ def builder_client(
     """A dashboard wired to a taxonomy service that talks to a scripted Vinted."""
     taxonomy = Taxonomy(SessionManager(db, transport), repo)
     with TestClient(create_app(web_settings, repo, taxonomy)) as test_client:
+        _arm_csrf(test_client)
         test_client.cookies.set(SESSION_COOKIE, TOKEN)
         yield test_client
 
@@ -400,3 +425,704 @@ def test_a_refusal_from_vinted_surfaces_as_a_502_with_the_reason(
 
     assert response.status_code == 502
     assert "error" in response.json()
+
+
+# --- The newer pages -----------------------------------------------------------------
+
+
+@pytest.mark.parametrize("path", ["/searches", "/destinations", "/activity"])
+def test_every_page_needs_a_login(client: TestClient, path: str) -> None:
+    response = client.get(path, follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/login"
+
+
+@pytest.mark.parametrize("path", ["/searches", "/destinations", "/activity"])
+def test_every_page_renders_when_signed_in(signed_in: TestClient, path: str) -> None:
+    response = signed_in.get(path)
+
+    assert response.status_code == 200
+    assert "<nav" in response.text
+
+
+async def test_the_searches_page_offers_an_editor_for_each_search(
+    signed_in: TestClient, repo: Repo
+) -> None:
+    signed_in.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=nike", "name": "my search"},
+        follow_redirects=False,
+    )
+
+    body = signed_in.get("/searches").text
+
+    assert "my search" in body
+    assert "Edit" in body
+    assert "data-disclosure" in body
+
+
+async def test_editing_a_search_saves_the_new_details(signed_in: TestClient, repo: Repo) -> None:
+    signed_in.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=nike", "name": "before"},
+        follow_redirects=False,
+    )
+    destination_id = await repo.add_destination(
+        kind="discord",
+        name="hook",
+        config={"webhook_url": "https://discord.com/api/webhooks/1/abc"},
+    )
+    query_id = (await repo.list_queries())[0].id
+    await repo.route(query_id, destination_id)
+
+    response = signed_in.post(
+        f"/searches/{query_id}/edit",
+        data={
+            "name": "after",
+            "interval": "300",
+            "max_total_price": "42",
+            "banned_keywords": "replica",
+            "destination_ids": str(destination_id),
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert "ok=" in response.headers["location"]
+    saved = await repo.get_query(query_id)
+    assert saved is not None
+    assert saved.name == "after"
+    assert saved.poll_interval_s == 300
+    assert saved.max_total_price == Decimal("42")
+    assert saved.banned_keywords == ["replica"]
+    assert await repo.destination_ids_for_query(query_id) == [destination_id]
+
+
+async def test_editing_a_search_replaces_its_routing(signed_in: TestClient, repo: Repo) -> None:
+    signed_in.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=nike"},
+        follow_redirects=False,
+    )
+    query_id = (await repo.list_queries())[0].id
+    await repo.route(
+        query_id,
+        await repo.add_destination(
+            kind="discord",
+            name="hook",
+            config={"webhook_url": "https://discord.com/api/webhooks/1/abc"},
+        ),
+    )
+
+    signed_in.post(
+        f"/searches/{query_id}/edit",
+        data={"name": "kept", "destination_ids": []},
+        follow_redirects=False,
+    )
+
+    assert await repo.destination_ids_for_query(query_id) == []
+
+
+async def test_editing_below_the_interval_floor_keeps_the_floor(
+    signed_in: TestClient, repo: Repo
+) -> None:
+    signed_in.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=nike"},
+        follow_redirects=False,
+    )
+    query_id = (await repo.list_queries())[0].id
+
+    signed_in.post(
+        f"/searches/{query_id}/edit",
+        data={"name": "x", "interval": "1"},
+        follow_redirects=False,
+    )
+
+    saved = await repo.get_query(query_id)
+    assert saved is not None
+    assert saved.poll_interval_s >= 10
+
+
+async def test_editing_a_search_that_is_gone_says_so(signed_in: TestClient) -> None:
+    response = signed_in.post("/searches/9999/edit", data={"name": "ghost"}, follow_redirects=False)
+
+    assert response.status_code == 303
+    assert "error=" in response.headers["location"]
+
+
+async def test_the_destinations_page_never_shows_the_secret_half_of_a_webhook(
+    signed_in: TestClient, repo: Repo
+) -> None:
+    secret = "https://discord.com/api/webhooks/123/supersecretvalue"
+    await repo.add_destination(kind="discord", name="hook", config={"webhook_url": secret})
+
+    body = signed_in.get("/destinations").text
+
+    assert "supersecretvalue" not in body
+    # Enough of the address survives to tell two webhooks apart, no more.
+    assert "discord.com" in body
+    assert "123" not in body.split("</body>")[0].split('class="target"')[1][:80]
+
+
+def test_a_webhook_url_is_masked_at_the_middle() -> None:
+    masked = _masked_target({"webhook_url": "https://discord.com/api/webhooks/123/supersecret"})
+
+    assert "supersecret" not in masked
+    # The tail of a Discord URL is the credential, so it is not shown either.
+    assert not masked.endswith("cret")
+
+
+def test_a_telegram_destination_shows_its_chat_id_in_full() -> None:
+    # A chat id is not a secret, and hiding it would make the page useless.
+    assert _masked_target({"chat_id": "-1001234567890"}) == "-1001234567890"
+
+
+def test_a_destination_with_nothing_configured_says_so() -> None:
+    assert _masked_target({}) == "not configured"
+
+
+async def test_a_disabled_destination_offers_a_reconnect_and_says_why(
+    signed_in: TestClient, repo: Repo
+) -> None:
+    destination_id = await repo.add_destination(
+        kind="telegram", name="my bot", config={"chat_id": "-1001234567890"}
+    )
+    await repo.deactivate_destination(destination_id, "bot blocked the chat")
+
+    body = signed_in.get("/destinations").text
+
+    assert "Reconnect" in body
+    assert "bot blocked the chat" in body
+    assert f"/destinations/{destination_id}/reactivate" in body
+
+
+async def test_reconnecting_a_destination_turns_it_back_on(
+    signed_in: TestClient, repo: Repo
+) -> None:
+    destination_id = await repo.add_destination(
+        kind="telegram", name="my bot", config={"chat_id": "-1001234567890"}
+    )
+    await repo.deactivate_destination(destination_id, "gone")
+
+    response = signed_in.post(f"/destinations/{destination_id}/reactivate", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert "ok=" in response.headers["location"]
+    restored = await repo.get_destination(destination_id)
+    assert restored is not None
+    assert restored.active is True
+    assert restored.deactivated_reason is None
+
+
+@pytest.mark.parametrize("posted,expected", [("1", True), ("0", False)], ids=["on", "off"])
+async def test_operational_notices_can_be_switched_per_destination(
+    signed_in: TestClient, repo: Repo, posted: str, expected: bool
+) -> None:
+    destination_id = await repo.add_destination(
+        kind="telegram", name="my bot", config={"chat_id": "-1001234567890"}
+    )
+
+    response = signed_in.post(
+        f"/destinations/{destination_id}/notify-status",
+        data={"notify_status": posted},
+        follow_redirects=False,
+    )
+
+    assert "ok=" in response.headers["location"]
+    assert (await repo.get_destination(destination_id)).notify_status is expected  # type: ignore[union-attr]
+
+
+async def test_the_activity_page_shows_a_full_window_of_days(signed_in: TestClient) -> None:
+    body = signed_in.get("/activity").text
+
+    assert 'role="img"' in body
+    # Two charts, fourteen days each: the empty days are the point.
+    assert body.count("bar-col") == 28
+    assert body.count("bar-label") == 28
+
+
+async def test_a_flash_message_arrives_as_a_query_parameter(signed_in: TestClient) -> None:
+    body = signed_in.get("/", params={"ok": "Saved \u201cnike\u201d."}).text
+
+    assert "Saved \u201cnike\u201d." in body
+    assert 'role="status"' in body or 'class="flash"' in body
+
+
+# --- Cross-site request forgery ------------------------------------------------------
+
+
+def test_a_page_hands_out_a_csrf_token(client: TestClient) -> None:
+    client.get("/login")
+
+    assert client.cookies.get(CSRF_COOKIE) is not None
+
+
+async def test_every_form_on_a_signed_in_page_carries_the_token(signed_in: TestClient) -> None:
+    signed_in.post(
+        "/destinations",
+        data={"kind": "discord", "name": "hook", "target": "https://discord.com/api/webhooks/1/a"},
+        follow_redirects=False,
+    )
+    signed_in.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=nike", "name": "shoes"},
+        follow_redirects=False,
+    )
+
+    for path in ("/", "/searches", "/destinations", "/activity"):
+        body = signed_in.get(path).text
+        for form in re.findall(r"<form\b.*?</form>", body, re.S):
+            assert 'name="csrf_token"' in form, f"{path}: {form[:80]}"
+
+
+def test_the_embedded_token_is_the_one_in_the_cookie(signed_in: TestClient) -> None:
+    body = signed_in.get("/").text
+
+    token = signed_in.cookies.get(CSRF_COOKIE)
+    assert token is not None and token in body
+
+
+async def test_a_post_without_a_token_is_refused(client: TestClient, repo: Repo) -> None:
+    """The session cookie alone is not consent: any site can make the browser send it."""
+    client.cookies.set(SESSION_COOKIE, TOKEN)
+
+    response = client.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=nike"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 403
+    assert await repo.list_queries() == []
+
+
+async def test_a_post_with_the_wrong_token_is_refused(client: TestClient, repo: Repo) -> None:
+    client.cookies.set(SESSION_COOKIE, TOKEN)
+    client.get("/login")
+    client.headers[CSRF_HEADER] = "a" * 43  # right length, wrong value
+
+    response = client.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=nike"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 403
+    assert await repo.list_queries() == []
+
+
+async def test_a_post_with_the_right_token_goes_through(signed_in: TestClient, repo: Repo) -> None:
+    response = signed_in.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=nike"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert len(await repo.list_queries()) == 1
+
+
+async def test_a_token_in_the_form_field_is_enough_too(signed_in: TestClient, repo: Repo) -> None:
+    """Browsers post the field; scripts post the header. Both are the same token."""
+    token = signed_in.cookies.get(CSRF_COOKIE)
+    assert token is not None
+    signed_in.headers.pop(CSRF_HEADER, None)
+
+    response = signed_in.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=nike", "csrf_token": token},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert len(await repo.list_queries()) == 1
+
+
+@pytest.mark.parametrize(
+    "path,data",
+    [
+        ("/logout", {}),
+        ("/searches", {"url": "https://www.vinted.fr/catalog?search_text=nike"}),
+        ("/searches/1/edit", {"name": "x"}),
+        ("/searches/1/pause", {"paused": "1"}),
+        ("/searches/1/delete", {}),
+        ("/searches/1/routes", {}),
+        (
+            "/destinations",
+            {"kind": "discord", "name": "n", "target": "https://discord.com/api/webhooks/1/a"},
+        ),
+        ("/destinations/1/delete", {}),
+        ("/destinations/1/reactivate", {}),
+        ("/destinations/1/notify-status", {"notify_status": "1"}),
+    ],
+)
+async def test_no_writing_route_is_left_open(
+    client: TestClient, repo: Repo, path: str, data: dict[str, str]
+) -> None:
+    """Every state change is behind the check, including ones added later.
+
+    New buttons are easy to add and easy to forget to protect, so this asks the app
+    rather than the source: post at every mutating URL and expect a refusal.
+    """
+    client.cookies.set(SESSION_COOKIE, TOKEN)
+    client.get("/login")
+
+    response = client.post(path, data=data, follow_redirects=False)
+
+    assert response.status_code == 403, path
+
+
+async def test_a_refused_post_leaves_the_browser_able_to_retry(signed_in: TestClient) -> None:
+    """After a 403 the page it goes on to show must still work."""
+    token = signed_in.cookies.get(CSRF_COOKIE)
+    assert token is not None
+
+    signed_in.headers[CSRF_HEADER] = "wrong"
+    signed_in.post("/searches", data={"url": "https://example.com"}, follow_redirects=False)
+    signed_in.headers[CSRF_HEADER] = token
+
+    assert (
+        signed_in.post(
+            "/searches",
+            data={"url": "https://www.vinted.fr/catalog?search_text=nike"},
+            follow_redirects=False,
+        ).status_code
+        == 303
+    )
+
+
+async def test_a_planted_short_cookie_is_replaced_not_trusted(
+    client: TestClient, repo: Repo
+) -> None:
+    """Another site can set a cookie on this host's parent domain; a short one is not ours."""
+    client.cookies.set(CSRF_COOKIE, "x")
+    client.cookies.set(SESSION_COOKIE, TOKEN)
+
+    embedded = re.search(r'name="csrf_token" value="([^"]*)"', client.get("/").text)
+
+    assert embedded is not None
+    assert embedded.group(1) != "x"
+    assert len(embedded.group(1)) >= 32
+
+
+async def test_a_refused_post_shows_a_page_rather_than_json(signed_in: TestClient) -> None:
+    signed_in.headers[CSRF_HEADER] = "wrong"
+
+    response = signed_in.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=nike"},
+        headers={"Accept": "text/html"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 403
+    assert "expired" in response.text
+    assert "Back to the dashboard" in response.text
+
+
+async def test_the_json_api_still_answers_with_json(signed_in: TestClient) -> None:
+    signed_in.headers[CSRF_HEADER] = "wrong"
+
+    response = signed_in.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=nike"},
+        headers={"Accept": "application/json"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 403
+    assert "detail" in response.json()
+
+
+# --- Browsing found listings --------------------------------------------------------
+
+
+async def _fill_with_listings(
+    signed_in: TestClient, repo: Repo, make_item: Callable[..., dict[str, Any]], count: int
+) -> None:
+    signed_in.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=nike", "name": "shoes"},
+        follow_redirects=False,
+    )
+    query = (await repo.list_queries())[0]
+    now = int(time.time())
+    items = [parse_item(make_item(i, photo_ts=now - i * 60), "fr") for i in range(1, count + 1)]
+    await repo.record_new_items(query, items, [])
+
+
+async def test_the_listing_browser_pages(
+    signed_in: TestClient, repo: Repo, make_item: Callable[..., dict[str, Any]]
+) -> None:
+    """Twenty-five listings at twenty-four a page is two pages, not one long scroll."""
+    await _fill_with_listings(signed_in, repo, make_item, 25)
+
+    first = signed_in.get("/listings")
+    second = signed_in.get("/listings", params={"page": 2})
+
+    assert first.status_code == 200
+    assert first.text.count("<article") == 24
+    assert second.text.count("<article") == 1
+    assert "25 listings found" in first.text
+    assert 'aria-current="page"' in first.text
+
+
+async def test_a_page_past_the_end_lands_on_the_last_one(
+    signed_in: TestClient, repo: Repo, make_item: Callable[..., dict[str, Any]]
+) -> None:
+    """Following a stale "next" should not show an empty grid with no way back."""
+    await _fill_with_listings(signed_in, repo, make_item, 30)
+
+    body = signed_in.get("/listings", params={"page": 99}).text
+
+    assert "<article" in body
+    assert "Page 2 of 2" in body
+
+
+async def test_nonsense_page_numbers_are_clamped(
+    signed_in: TestClient, repo: Repo, make_item: Callable[..., dict[str, Any]]
+) -> None:
+    await _fill_with_listings(signed_in, repo, make_item, 30)
+
+    for bad in ("0", "-5", "not-a-number"):
+        assert "<article" in signed_in.get("/listings", params={"page": bad}).text
+
+
+async def test_pages_do_not_repeat_or_skip_a_listing(
+    signed_in: TestClient, repo: Repo, make_item: Callable[..., dict[str, Any]]
+) -> None:
+    """The ordering has to be total or a listing can fall between two pages.
+
+    first_seen_at is only to the second, so several listings share a timestamp; the id
+    tiebreak is what keeps the order from shuffling between requests.
+    """
+    await _fill_with_listings(signed_in, repo, make_item, 40)
+
+    seen: list[str] = []
+    for page in (1, 2):
+        body = signed_in.get("/listings", params={"page": page}).text
+        seen.extend(re.findall(r'href="(https://www\.vinted\.fr/items/\d+)"', body))
+
+    assert len(seen) == 40
+    assert len(set(seen)) == 40, "no listing appears on two pages"
+
+
+async def test_the_browser_can_be_filtered_by_search(
+    signed_in: TestClient, repo: Repo, make_item: Callable[..., dict[str, Any]]
+) -> None:
+    signed_in.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=nike", "name": "shoes"},
+        follow_redirects=False,
+    )
+    signed_in.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=adidas", "name": "trainers"},
+        follow_redirects=False,
+    )
+    now = int(time.time())
+    for name, ids in (("shoes", range(1, 6)), ("trainers", range(100, 103))):
+        query = next(q for q in await repo.list_queries() if q.name == name)
+        await repo.record_new_items(
+            query, [parse_item(make_item(i, photo_ts=now), "fr") for i in ids], []
+        )
+
+    shoes, trainers = await repo.list_queries()
+    body = signed_in.get("/listings", params={"search": shoes.id}).text
+
+    assert "5 listings found" in body
+    assert "shoes" in body
+    # The dropdown offers both searches; the grid must only hold the filtered one.
+    assert body.count("<article") == 5
+    assert trainers.id not in [
+        int(m) for m in re.findall(r'href="/listings\?page=2&amp;search=(\d+)', body)
+    ]
+
+
+async def test_the_browser_can_be_searched_by_text(
+    signed_in: TestClient, repo: Repo, make_item: Callable[..., dict[str, Any]]
+) -> None:
+    await _fill_with_listings(signed_in, repo, make_item, 5)
+
+    body = signed_in.get("/listings", params={"q": "Nike"}).text
+
+    assert "5 listings" in body
+
+
+async def test_a_search_that_matches_nothing_says_so_rather_than_looking_broken(
+    signed_in: TestClient, repo: Repo, make_item: Callable[..., dict[str, Any]]
+) -> None:
+    await _fill_with_listings(signed_in, repo, make_item, 5)
+
+    body = signed_in.get("/listings", params={"q": "zzz-nothing-matches"}).text
+
+    assert "Nothing matches" in body
+    assert "<article" not in body
+
+
+async def test_page_links_carry_the_filter_with_them(
+    signed_in: TestClient, repo: Repo, make_item: Callable[..., dict[str, Any]]
+) -> None:
+    """The classic paging bug: narrow it, click next, get the unfiltered page two."""
+    signed_in.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=nike", "name": "shoes"},
+        follow_redirects=False,
+    )
+    query = (await repo.list_queries())[0]
+    now = int(time.time())
+    await repo.record_new_items(
+        query,
+        [parse_item(make_item(i, photo_ts=now - i * 60), "fr") for i in range(1, 31)],
+        [],
+    )
+
+    body = signed_in.get("/listings", params={"search": query.id, "page": 2}).text
+
+    assert f"search={query.id}" in body
+
+
+async def test_a_search_term_cannot_reach_the_query(
+    signed_in: TestClient, repo: Repo, make_item: Callable[..., dict[str, Any]]
+) -> None:
+    """The wildcards go in the parameter, so a quote in the search box is just text."""
+    await _fill_with_listings(signed_in, repo, make_item, 3)
+
+    assert signed_in.get("/listings", params={"q": "' OR 1=1 --"}).status_code == 200
+    assert signed_in.get("/listings", params={"q": "%"}).status_code == 200
+
+
+async def test_the_browser_needs_a_login(client: TestClient) -> None:
+    assert client.get("/listings", follow_redirects=False).status_code == 303
+
+
+async def test_an_empty_browser_explains_itself(signed_in: TestClient) -> None:
+    body = signed_in.get("/listings").text
+
+    assert "Nothing found yet" in body
+    assert "pager" not in body
+
+
+# --- Destination delivery panel ------------------------------------------------------
+
+
+async def _deliver(
+    repo: Repo,
+    destination_id: int,
+    *,
+    count: int,
+    latency_s: int,
+    status: str = "sent",
+) -> None:
+    """Write finished notifications with a known queue-to-arrival delay.
+
+    item_id is derived from the arguments rather than a counter or a hash: a salted
+    hash would give a different answer on every run, and outbox rows are unique on
+    (item_id, destination_id), so two calls that collide silently become one.
+    """
+    now = int(time.time())
+    item_id = (destination_id * 10_000 + count * 97 + len(status)) * 100 + 1
+    query = (await repo.list_queries())[0]
+    for i in range(count):
+        await repo._db.execute(
+            "INSERT OR IGNORE INTO items (item_id, query_id, tld, url, first_seen_at) "
+            "VALUES (?, ?, 'fr', 'https://www.vinted.fr/items/x', ?)",
+            (item_id + i, query.id, now),
+        )
+        await repo._db.execute(
+            "INSERT OR IGNORE INTO outbox (item_id, query_id, destination_id, status, "
+            "attempts, next_attempt_at, created_at, sent_at) "
+            "VALUES (?, ?, ?, ?, 1, ?, ?, ?)",
+            (
+                item_id + i,
+                query.id,
+                destination_id,
+                status,
+                now,
+                now - latency_s,
+                now if status == "sent" else None,
+            ),
+        )
+
+
+async def _destination_with_deliveries(signed_in: TestClient, repo: Repo, **kwargs: Any) -> int:
+    signed_in.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=nike"},
+        follow_redirects=False,
+    )
+    destination_id = await repo.add_destination(
+        kind="webhook", name="hook", config={"url": "https://example.com/hook"}
+    )
+    await _deliver(repo, destination_id, **kwargs)
+    return destination_id
+
+
+async def test_a_healthy_destination_shows_its_wait_and_success_rate(
+    signed_in: TestClient, repo: Repo
+) -> None:
+    await _destination_with_deliveries(signed_in, repo, count=8, latency_s=2)
+
+    body = signed_in.get("/destinations").text
+
+    assert "Typical wait" in body
+    assert "2.0s" in body
+    assert "Arrived" in body
+    assert "delivery-ok" in body
+
+
+async def test_a_slow_destination_is_flagged(signed_in: TestClient, repo: Repo) -> None:
+    """A backlog shows up as a growing wait long before anything fails."""
+    await _destination_with_deliveries(signed_in, repo, count=5, latency_s=300)
+
+    body = signed_in.get("/destinations").text
+
+    assert "delivery-slow" in body
+    assert "300.0s" in body
+
+
+async def test_a_destination_that_keeps_failing_is_flagged(
+    signed_in: TestClient, repo: Repo
+) -> None:
+    await _destination_with_deliveries(signed_in, repo, count=1, latency_s=1)
+    await _deliver(
+        repo, (await repo.list_destinations())[0].id, count=9, latency_s=1, status="failed"
+    )
+
+    body = signed_in.get("/destinations").text
+
+    assert "delivery-failing" in body
+
+
+async def test_a_destination_with_nothing_sent_says_nothing_wrong(
+    signed_in: TestClient, repo: Repo
+) -> None:
+    """No deliveries is not a claim about delivery, so no numbers are invented."""
+    signed_in.post(
+        "/destinations",
+        data={"kind": "webhook", "name": "fresh", "target": "https://example.com/new"},
+        follow_redirects=False,
+    )
+
+    body = signed_in.get("/destinations").text
+
+    # The page's explanatory prose names the field; the card must not claim a value.
+    assert 'class="delivery ' not in body
+    assert "delivery-ok" not in body
+
+
+async def test_the_median_is_used_not_the_mean(signed_in: TestClient, repo: Repo) -> None:
+    """One slow notification should not paint every normal one as slow.
+
+    Nine quick sends and one that took an hour: the mean says a minute, the median says
+    what nearly every alert actually experiences.
+    """
+    destination_id = await _destination_with_deliveries(signed_in, repo, count=9, latency_s=1)
+    await _deliver(repo, destination_id, count=1, latency_s=3600)
+
+    body = signed_in.get("/destinations").text
+
+    assert "1.0s" in body
+    assert "delivery-ok" in body, "one slow send should not condemn the destination"

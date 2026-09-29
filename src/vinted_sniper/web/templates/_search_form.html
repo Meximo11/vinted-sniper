@@ -1,0 +1,133 @@
+{# The add-a-search panel, shared by the dashboard's quick action and the searches
+   page. One include rather than two copies: the builder's ids and its script are
+   written against a single form, and two versions of the same form would drift. #}
+
+<form method="post" action="/searches">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="field">
+    <label for="url">Vinted search URL</label>
+    <div class="url-row">
+      <input type="url" id="url" name="url" required
+             placeholder="https://www.vinted.fr/catalog?search_text=...">
+      {% if builder_enabled %}
+      <button type="button" class="btn btn-quiet" id="builder-toggle" aria-expanded="false"
+              aria-controls="builder">Build a search instead ▾</button>
+      {% endif %}
+    </div>
+    <p class="hint">
+      The easiest way to get one: set up your search on Vinted, then copy the address
+      bar once results are showing.
+    </p>
+  </div>
+
+  {% if builder_enabled %}
+  <div id="builder" hidden>
+    <div class="form-grid">
+      <div class="field">
+        <label for="b-tld">Site</label>
+        <select id="b-tld">
+          {% for t in known_tlds %}
+          <option value="{{ t }}" {% if t == default_tld %}selected{% endif %}>vinted.{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="b-text">Search text</label>
+        <input type="text" id="b-text" placeholder="nike air max">
+      </div>
+      <div class="field">
+        <label for="b-price-from">Price from</label>
+        <input type="text" id="b-price-from" inputmode="decimal" placeholder="any">
+      </div>
+      <div class="field">
+        <label for="b-price-to">Price to</label>
+        <input type="text" id="b-price-to" inputmode="decimal" placeholder="any">
+      </div>
+    </div>
+
+    <div class="builder-block">
+      <span class="group-label">Category</span>
+      <div class="crumb-row" id="b-crumbs"></div>
+      <div class="check-grid mt-sm" id="b-cats">
+        <span class="muted">Loading categories…</span>
+      </div>
+    </div>
+
+    <div class="builder-block">
+      <label for="b-brand">Brands</label>
+      <div class="check-grid" id="b-brand-chips"></div>
+      <div class="combo mt-sm">
+        <input type="text" id="b-brand" placeholder="start typing, e.g. nike or zara"
+               autocomplete="off" role="combobox" aria-expanded="false"
+               aria-controls="b-brand-list">
+        <div class="combo-list" id="b-brand-list" hidden role="listbox"></div>
+      </div>
+    </div>
+
+    <div class="form-grid builder-block">
+      <div>
+        <span class="group-label">Condition</span>
+        <div class="option-list" id="b-status"><span class="muted">Loading…</span></div>
+      </div>
+      <div>
+        <span class="group-label">Colour</span>
+        <div class="option-list" id="b-color"><span class="muted">Loading…</span></div>
+      </div>
+    </div>
+
+    <div class="builder-block" id="b-size-wrap" hidden>
+      <span class="group-label">Size</span>
+      <div class="option-list" id="b-size"></div>
+    </div>
+
+    <p class="hint mt-md" id="b-preview"></p>
+  </div>
+  {% endif %}
+
+  <div class="form-grid mt-md">
+    <div class="field">
+      <label for="name">Name</label>
+      <input type="text" id="name" name="name" placeholder="Left to guess from the search">
+    </div>
+    <div class="field">
+      <label for="interval">Check every (seconds)</label>
+      <input type="text" id="interval" name="interval"
+             value="{{ default_interval }}" inputmode="numeric">
+      <p class="hint">Minimum {{ min_interval }}s.</p>
+    </div>
+    <div class="field">
+      <label for="max_total_price">Max total price</label>
+      <input type="text" id="max_total_price" name="max_total_price"
+             inputmode="decimal" placeholder="e.g. 40">
+      <p class="hint">What you actually pay, buyer protection included.</p>
+    </div>
+    <div class="field">
+      <label for="banned_keywords">Exclude words</label>
+      <input type="text" id="banned_keywords" name="banned_keywords"
+             placeholder="fake, replica">
+    </div>
+  </div>
+
+  {% if destinations %}
+  <div class="mt-md">
+    <span class="group-label">Send matches to</span>
+    <div class="check-grid mt-sm">
+      {% for destination in destinations if destination.active %}
+      <label class="check">
+        <input type="checkbox" name="destination_ids" value="{{ destination.id }}" checked>
+        {{ destination.name }}
+        <span class="muted">({{ destination.kind }})</span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Watch this search</button>
+  </div>
+</form>
+
+{% if builder_enabled %}
+<script src="/static/builder.js"></script>
+{% endif %}
