@@ -407,7 +407,9 @@ def test_junk_in_catalog_ids_never_reaches_vinted(
 
     builder_client.get("/api/filters/fr/brands?q=nike&catalog_ids=12,drop%20table,34")
 
-    assert transport.requests[-1]["params"]["catalog_ids"] == "12,34"
+    # The picker still speaks `catalog_ids`; the filter service it forwards to calls it
+    # `catalog`. What matters here is that the junk never survives either way.
+    assert transport.requests[-1]["params"]["catalog"] == "12,34"
 
 
 def test_an_unknown_facet_is_a_404(builder_client: TestClient) -> None:

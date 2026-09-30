@@ -276,7 +276,9 @@ class Taxonomy:
                 {
                     "filter_search_code": "brand",
                     "filter_search_text": query,
-                    "catalog_ids": catalog_ids,
+                    # The filter service names the category scope `catalog`, not the
+                    # `catalog_ids` the catalogue endpoint uses.
+                    "catalog": catalog_ids,
                 },
                 with_csrf=True,
             )
@@ -311,7 +313,7 @@ class Taxonomy:
             raise ValueError(f"{code!r} is not a filter this app knows how to ask for")
         params = {"filter_code": code}
         if catalog_ids:
-            params["catalog_ids"] = catalog_ids
+            params["catalog"] = catalog_ids
         payload = await self._api_get(
             tld, urls.filters_facets_endpoint(tld), params, with_csrf=True
         )

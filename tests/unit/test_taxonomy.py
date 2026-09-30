@@ -10,7 +10,8 @@ import pytest
 from tests.conftest import ScriptedTransport
 from vinted_sniper.db import Database
 from vinted_sniper.db.repo import Repo
-from vinted_sniper.vinted.errors import MalformedResponseError
+from vinted_sniper.vinted import urls
+from vinted_sniper.vinted.errors import MalformedResponseError, NetworkError
 from vinted_sniper.vinted.session import SessionManager
 from vinted_sniper.vinted.taxonomy import (
     Taxonomy,
@@ -204,7 +205,7 @@ async def test_facet_requests_carry_the_csrf_token_from_the_page(
     assert options == [{"id": 6, "title": "New", "count": 3}]
     api_request = transport.requests[-1]
     assert api_request["headers"]["X-Csrf-Token"] == "csrf-from-the-page"
-    assert api_request["params"] == {"filter_code": "status", "catalog_ids": "1242"}
+    assert api_request["params"] == {"filter_code": "status", "catalog": "1242"}
 
 
 async def test_a_401_gets_one_fresh_session_and_one_retry(
@@ -278,9 +279,9 @@ async def test_brand_search_within_a_category_uses_the_scoped_endpoint(
 
     assert brands == [{"id": 53, "title": "Nike"}]
     request = transport.requests[-1]
-    assert "/api/v2/catalog/filters/search" in request["url"]
+    assert request["url"] == urls.filters_search_endpoint("fr")
     assert request["params"]["filter_search_text"] == "nik"
-    assert request["params"]["catalog_ids"] == "1242"
+    assert request["params"]["catalog"] == "1242"
     assert "X-Csrf-Token" in request["headers"]
 
 
@@ -289,3 +290,101 @@ async def test_a_blank_brand_query_asks_vinted_nothing(
 ) -> None:
     assert await taxonomy.brands("fr", "   ") == []
     assert transport.requests == []
+
+
+# --- Where the filter service lives ----------------------------------------------------
+
+
+def test_filter_endpoints_are_asked_of_the_api_gateway() -> None:
+    """Regression: Vinted retired `/api/v2/catalog/filters/...` and answers 404 there.
+
+    The filter service moved behind the API gateway onto the `api` host and the `/svc-filters/`
+    routes, which is where the site's own frontend now reads them from. Asking the site host
+    for the old paths is what surfaced as "vinted.de returned an unexpected 404" on the
+    dashboard, so both spellings are pinned here.
+    """
+    assert urls.filters_facets_endpoint("de") == "https://api.vinted.de/svc-filters/filters/facets"
+    assert urls.filters_search_endpoint("de") == "https://api.vinted.de/svc-filters/filters/search"
+
+    for tld in ("de", "fr"):
+        for endpoint in (urls.filters_facets_endpoint(tld), urls.filters_search_endpoint(tld)):
+            assert endpoint.startswith("https://api.vinted.")
+            assert "/svc-filters/" in endpoint
+            assert "/api/v2/" not in endpoint
+
+
+async def test_facet_options_travel_to_the_gateway_with_a_catalog_scope(
+    taxonomy: Taxonomy, transport: ScriptedTransport
+) -> None:
+    queue_bootstrap(transport)
+    queue_page(transport, flight_page())
+    transport.queue(
+        Response(
+            status_code=200,
+            text=json.dumps(
+                {
+                    "filter_code": "color",
+                    "options": [{"id": "1", "title": "Noir", "items_count": 22173}],
+                }
+            ),
+            headers={},
+            cookies={},
+        )
+    )
+
+    options = await taxonomy.facet_options("de", "color", "1059")
+
+    assert options == [{"id": 1, "title": "Noir", "count": 22173}]
+    request = transport.requests[-1]
+    assert request["url"] == urls.filters_facets_endpoint("de")
+    # The scope is `catalog` on this service; `catalog_ids` is the catalogue's spelling.
+    assert request["params"] == {"filter_code": "color", "catalog": "1059"}
+
+
+async def test_a_404_from_the_filter_service_is_reported_not_swallowed(
+    taxonomy: Taxonomy, transport: ScriptedTransport
+) -> None:
+    """An unavailable filter must not read as "this filter has no options"."""
+    queue_bootstrap(transport)
+    queue_page(transport, flight_page())
+    transport.queue_status(404, "<html>not found</html>")
+
+    with pytest.raises(NetworkError, match="unexpected 404"):
+        await taxonomy.facet_options("de", "color", "1059")
+
+
+async def test_sizes_nested_two_deep_still_flatten(
+    taxonomy: Taxonomy, transport: ScriptedTransport
+) -> None:
+    """The size chart nests one level deeper than it used to; both levels are labelled."""
+    queue_bootstrap(transport)
+    queue_page(transport, flight_page())
+    transport.queue(
+        Response(
+            status_code=200,
+            text=json.dumps(
+                {
+                    "filter_code": "size",
+                    "options": [
+                        {
+                            "id": "1904",
+                            "options": [
+                                {
+                                    "id": "WOMEN-LT",
+                                    "options": [
+                                        {"id": "1226", "title": "XXXS", "items_count": 106}
+                                    ],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ),
+            headers={},
+            cookies={},
+        )
+    )
+
+    options = await taxonomy.facet_options("de", "size", "1059")
+
+    assert options == [{"id": 1226, "title": "XXXS", "count": 106, "group": "WOMEN-LT"}]

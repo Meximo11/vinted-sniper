@@ -169,13 +169,18 @@ def brands_endpoint(tld: str) -> str:
 
 
 def filters_search_endpoint(tld: str) -> str:
-    """Search within one filter's options — e.g. brands that exist in a category."""
-    return f"https://www.vinted.{tld}/api/v2/catalog/filters/search"
+    """Search within one filter's options — e.g. brands that exist in a category.
+
+    The filter service lives behind the API gateway, on the `api` host, not on the site:
+    the `/api/v2/catalog/filters/...` routes it used to answer on were retired and now
+    return 404, and the site's own frontend reads these from `/svc-filters/`.
+    """
+    return f"https://api.vinted.{tld}/svc-filters/filters/search"
 
 
 def filters_facets_endpoint(tld: str) -> str:
     """The options of one filter (condition, colour, size…), scoped to a category."""
-    return f"https://www.vinted.{tld}/api/v2/catalog/filters/facets"
+    return f"https://api.vinted.{tld}/svc-filters/filters/facets"
 
 
 def catalog_page(tld: str) -> str:
