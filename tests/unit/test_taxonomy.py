@@ -349,7 +349,7 @@ async def test_a_404_from_the_filter_service_is_reported_not_swallowed(
     queue_page(transport, flight_page())
     transport.queue_status(404, "<html>not found</html>")
 
-    with pytest.raises(NetworkError, match="unexpected 404"):
+    with pytest.raises(NetworkError, match="unerwartet 404"):
         await taxonomy.facet_options("de", "color", "1059")
 
 

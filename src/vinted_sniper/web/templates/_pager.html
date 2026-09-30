@@ -36,8 +36,8 @@
     {% set _ = ns.shown.append(n) %}
   {% endif %}
 {% endfor %}
-<nav class="pager" aria-label="Pagination">
-  {% if current > 1 %}{{ link(url, carried, current - 1, '‹ Previous', current) }}{% endif %}
+<nav class="pager" aria-label="Seitennavigation">
+  {% if current > 1 %}{{ link(url, carried, current - 1, '‹ Zurück', current) }}{% endif %}
   {% for item in ns.shown %}
     {% if item == '…' %}
       <span class="gap" aria-hidden="true">…</span>
@@ -45,7 +45,7 @@
       {{ link(url, carried, item, item, current) }}
     {% endif %}
   {% endfor %}
-  {% if current < pages %}{{ link(url, carried, current + 1, 'Next ›', current) }}{% endif %}
+  {% if current < pages %}{{ link(url, carried, current + 1, 'Weiter ›', current) }}{% endif %}
 </nav>
 {% endif %}
 {%- endmacro %}

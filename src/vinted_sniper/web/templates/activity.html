@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% import "_icons.html" as ui %}
 
-{% block title %}Activity · vinted-sniper{% endblock %}
-{% block heading %}Activity{% endblock %}
+{% block title %}Aktivität · vinted-sniper{% endblock %}
+{% block heading %}Aktivität{% endblock %}
 
 {% macro chart(series, label) -%}
-{# Every day in the window is drawn, including the empty ones. A bar chart with the
-   zeros removed looks tidier and is worse: a search that used to find ten a day and now
-   finds none is the exact thing this page exists to make visible. #}
+{# Jeder Tag im Zeitraum wird gezeichnet, auch die leeren. Ein Balkendiagramm ohne die
+   Nullen sieht ordentlicher aus und ist schlechter: Eine Suche, die früher zehn am Tag
+   gefunden hat und heute keine, ist genau das, was diese Seite sichtbar machen soll. #}
 <div class="chart" role="img" aria-label="{{ label }}">
   {% for day, count in series %}
   {% set peak = series | map(attribute=1) | max %}
@@ -22,68 +22,67 @@
 
 {% block content %}
 
-<section aria-label="Totals">
-  <div class="section-head"><h2>Totals</h2></div>
+<section aria-label="Summen">
   <div class="stat-grid">
     <div class="stat tone-accent">
-      <div class="label">{{ ui.icon("box") }} Listings found</div>
+      <div class="label">{{ ui.icon("box") }} Gefundene Artikel</div>
       <div class="value">{{ found_today }}</div>
-      <div class="hint">{{ found_week }} in the last 7 days</div>
+      <div class="hint">{{ found_week }} in den letzten 7 Tagen</div>
     </div>
     <div class="stat tone-ok">
-      <div class="label">{{ ui.icon("send") }} Notifications sent</div>
+      <div class="label">{{ ui.icon("send") }} Benachrichtigungen</div>
       <div class="value">{{ outbox.sent }}</div>
-      <div class="hint">{{ sent_week }} in the last 7 days</div>
+      <div class="hint">{{ sent_week }} in den letzten 7 Tagen</div>
     </div>
     <div class="stat {% if outbox.failed %}tone-bad{% endif %}">
-      <div class="label">{{ ui.icon("alert") }} Failed</div>
+      <div class="label">{{ ui.icon("alert") }} Fehlgeschlagen</div>
       <div class="value">{{ outbox.failed }}</div>
-      <div class="hint">gave up after 6 attempts</div>
+      <div class="hint">nach 6 Versuchen aufgegeben</div>
     </div>
     <div class="stat">
-      <div class="label">{{ ui.icon("clock") }} Expired</div>
+      <div class="label">{{ ui.icon("clock") }} Abgelaufen</div>
       <div class="value">{{ outbox.cancelled }}</div>
-      <div class="hint">older than the delivery window</div>
+      <div class="hint">älter als das Zustellfenster</div>
     </div>
     <div class="stat">
-      <div class="label">{{ ui.icon("activity") }} Waiting</div>
+      <div class="label">{{ ui.icon("activity") }} Wartend</div>
       <div class="value">{{ outbox.pending + outbox.sending }}</div>
-      <div class="hint">queued or in flight</div>
+      <div class="hint">in der Warteschlange oder unterwegs</div>
     </div>
   </div>
 </section>
 
-<section aria-label="Activity over time">
+<section aria-label="Aktivität im Zeitverlauf">
   <div class="section-head">
-    <h2>Last 14 days</h2>
+    <h2>Letzte 14 Tage</h2>
   </div>
   <div class="card card-pad chart-group">
     <div>
-      <span class="chart-label">Listings found</span>
-      {{ chart(listings_series, "Listings found per day over the last 14 days") }}
+      <span class="chart-label">Gefundene Artikel</span>
+      {{ chart(listings_series, "Gefundene Artikel pro Tag in den letzten 14 Tagen") }}
     </div>
     <div>
-      <span class="chart-label">Notifications delivered</span>
-      {{ chart(sent_series, "Notifications delivered per day over the last 14 days") }}
+      <span class="chart-label">Zugestellte Benachrichtigungen</span>
+      {{ chart(sent_series, "Zugestellte Benachrichtigungen pro Tag in den letzten 14 Tagen") }}
     </div>
   </div>
 </section>
 
-<section aria-label="Per-search health">
-  <div class="section-head"><h2>Per search</h2></div>
+<section aria-label="Zustand je Suche">
+  <div class="section-head"><h2>Je Suche</h2></div>
   {% if not snapshot.searches %}
     <div class="card empty">
       {{ ui.icon("search") }}
-      <h3>Nothing being watched</h3>
-      <p>Once a search is running, its totals and its health appear here.</p>
+      <h3>Es wird nichts beobachtet</h3>
+      <p>Sobald eine Suche läuft, stehen hier ihre Summen und ihr Zustand.</p>
     </div>
   {% else %}
   <div class="card table-wrap">
     <table>
       <thead>
         <tr>
-          <th>Search</th><th>State</th><th>Seen</th><th>Blocks</th>
-          <th>Rate limits</th><th>Quiet checks</th><th>Last success</th>
+          <th>Suche</th><th>Status</th><th>Gesehen</th><th>Blocksperren</th>
+          <th>Rate-Limits</th><th>Ohne Treffer</th><th>Letzter Erfolg</th>
         </tr>
       </thead>
       <tbody>
@@ -94,13 +93,13 @@
             <div class="cell-title">{{ search.name }}</div>
             <div class="cell-note">vinted.{{ search.tld }}</div>
           </td>
-          <td><span class="pill {{ search.state }}">{{ search.state }}</span></td>
+          <td><span class="pill {{ search.state }}">{{ search.state_label or search.state }}</span></td>
           <td class="muted">{{ search.items_total }}</td>
           <td class="muted">{{ search.blocks }}</td>
           <td class="muted">{{ search.rate_limits }}</td>
           <td class="muted">{{ search.checks_without_new_listings }}</td>
           <td class="muted nowrap">
-            {% if search.last_success_at %}{{ _age(search.last_success_at, now) }}{% else %}never{% endif %}
+            {% if search.last_success_at %}{{ _age(search.last_success_at, now) }}{% else %}nie{% endif %}
           </td>
         </tr>
         {% if detail and detail.last_error %}
@@ -119,19 +118,19 @@
   {% endif %}
 </section>
 
-<section aria-label="Recent errors">
-  <div class="section-head"><h2>Recent errors</h2></div>
+<section aria-label="Letzte Fehler">
+  <div class="section-head"><h2>Letzte Fehler</h2></div>
   {% if not recent_failures %}
     <div class="card empty">
       {{ ui.icon("check") }}
-      <h3>No errors recorded</h3>
-      <p>Every check that has run since this database was created has either succeeded
-         or left no error behind.</p>
+      <h3>Keine Fehler erfasst</h3>
+      <p>Jede Abfrage seit dem Anlegen dieser Datenbank war entweder erfolgreich oder hat
+         keinen Fehler hinterlassen.</p>
     </div>
   {% else %}
   <div class="card table-wrap">
     <table>
-      <thead><tr><th>When</th><th>Search</th><th>What happened</th></tr></thead>
+      <thead><tr><th>Wann</th><th>Suche</th><th>Was passiert ist</th></tr></thead>
       <tbody>
         {% for failure in recent_failures %}
         <tr>

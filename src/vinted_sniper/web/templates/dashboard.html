@@ -2,71 +2,72 @@
 {% import "_icons.html" as ui %}
 {% import "_listing_card.html" as cards %}
 
-{% block title %}Dashboard · vinted-sniper{% endblock %}
-{% block heading %}Dashboard{% endblock %}
+{% block title %}Übersicht · vinted-sniper{% endblock %}
+{% block heading %}Übersicht{% endblock %}
 
 {% block actions %}
-<a class="btn btn-primary" href="/searches#new">{{ ui.icon("plus") }}<span>New search</span></a>
+<a class="btn btn-primary" href="/searches#neu">{{ ui.icon("plus") }}<span>Neue Suche</span></a>
 {% endblock %}
 
 {% block content %}
 
-{# --- Is the app healthy? A verdict about the whole thing, so it gets one line,
-     not a fifth number competing with four counts. It only tints when wrong. --- #}
+{# --- Läuft es? Eine Aussage über das Ganze, also eine Zeile und nicht eine fünfte
+     Zahl, die mit vier anderen um Aufmerksamkeit konkurriert. Färbt sich nur, wenn
+     etwas nicht stimmt. #}
 <div class="statusbar {% if not snapshot.alive %}bad{% elif unhealthy %}warn{% endif %}"
      role="status">
   <span class="dot"></span>
   {% if not snapshot.alive %}
-    <span>The app stopped responding to its own health check.</span>
+    <span>Die App antwortet nicht mehr auf ihre eigene Zustandsprüfung.</span>
   {% elif unhealthy %}
-    <span>{{ unhealthy }} search{{ 's' if unhealthy != 1 }} need attention.</span>
-    <a href="#attention">See what</a>
+    <span>{{ unhealthy }} Such{{ 'e' if unhealthy == 1 else 'en' }} brauchen Aufmerksamkeit.</span>
+    <a href="#aufmerksamkeit">Ansehen</a>
   {% else %}
-    <span>All searches are running normally.</span>
+    <span>Alle Suchen laufen normal.</span>
   {% endif %}
   <span class="spacer"></span>
   <span class="nowrap">
-    {% if last_success_at %}Last poll {{ _age(last_success_at, now) }}{% else %}No successful poll yet{% endif %}
+    {% if last_success_at %}Letzte Abfrage {{ _age(last_success_at, now) }}{% else %}Noch keine erfolgreiche Abfrage{% endif %}
   </span>
 </div>
 
-{# --- The counts, in the order you would ask for them ------------------------- #}
-<section aria-label="Overview">
+{# --- Die Zahlen, in der Reihenfolge, in der man sie erfragen würde ------------------- #}
+<section aria-label="Überblick">
   <div class="stat-grid">
     <div class="stat">
-      <div class="label">{{ ui.icon("search") }} Active searches</div>
+      <div class="label">{{ ui.icon("search") }} Aktive Suchen</div>
       <div class="value">{{ search_counts.active }}</div>
       <div class="hint">
-        {% if search_counts.paused %}{{ search_counts.paused }} paused{% else %}none paused{% endif %},
-        {{ search_counts.total }} total
+        {% if search_counts.paused %}{{ search_counts.paused }} pausiert{% else %}keine pausiert{% endif %},
+        {{ search_counts.total }} gesamt
       </div>
     </div>
 
     <div class="stat tone-accent">
-      <div class="label">{{ ui.icon("box") }} Found today</div>
+      <div class="label">{{ ui.icon("box") }} Heute gefunden</div>
       <div class="value">{{ found_today }}</div>
-      <div class="hint">{{ found_week }} in the last 7 days</div>
+      <div class="hint">{{ found_week }} in den letzten 7 Tagen</div>
     </div>
 
     <div class="stat tone-ok">
-      <div class="label">{{ ui.icon("send") }} Delivered</div>
+      <div class="label">{{ ui.icon("send") }} Zugestellt</div>
       <div class="value">{{ outbox.sent }}</div>
-      <div class="hint">{{ outbox.pending + outbox.sending }} waiting to send</div>
+      <div class="hint">{{ outbox.pending + outbox.sending }} warten auf Versand</div>
     </div>
 
     <div class="stat {% if outbox.failed %}tone-bad{% endif %}">
-      <div class="label">{{ ui.icon("alert") }} Failed</div>
+      <div class="label">{{ ui.icon("alert") }} Fehlgeschlagen</div>
       <div class="value">{{ outbox.failed }}</div>
-      <div class="hint">{% if outbox.cancelled %}{{ outbox.cancelled }} gave up{% else %}nothing gave up{% endif %}</div>
+      <div class="hint">{% if outbox.cancelled %}{{ outbox.cancelled }} aufgegeben{% else %}nichts aufgegeben{% endif %}</div>
     </div>
   </div>
 </section>
 
-{# --- What needs looking at --------------------------------------------------- #}
+{# --- Was man sich ansehen muss ------------------------------------------------------ #}
 {% if recent_failures or destinations_off %}
-<section id="attention" aria-label="Needs attention">
+<section id="aufmerksamkeit" aria-label="Braucht Aufmerksamkeit">
   <div class="section-head">
-    <h2>Needs attention</h2>
+    <h2>Braucht Aufmerksamkeit</h2>
   </div>
   <div class="card">
     <div class="attention">
@@ -87,12 +88,12 @@
       <div class="attention-row">
         {{ ui.icon("bell") }}
         <div>
-          <div class="cell-title">{{ destination.name }} is not receiving notifications</div>
+          <div class="cell-title">{{ destination.name }} empfängt keine Benachrichtigungen</div>
           <div class="cell-note">
-            {{ destination.deactivated_reason or 'Switched off.' }}
+            {{ destination.deactivated_reason or 'Abgeschaltet.' }}
           </div>
         </div>
-        <a class="btn btn-sm spacer" href="/destinations">Review</a>
+        <a class="btn btn-sm spacer" href="/destinations">Prüfen</a>
       </div>
       {% endfor %}
     </div>
@@ -100,38 +101,38 @@
 </section>
 {% endif %}
 
-{# --- Recently found ---------------------------------------------------------- #}
-<section aria-label="Recently found">
+{# --- Zuletzt gefunden --------------------------------------------------------------- #}
+<section aria-label="Zuletzt gefunden">
   <div class="section-head">
-    <h2>Recently found</h2>
+    <h2>Zuletzt gefunden</h2>
     <div class="spacer"></div>
-    <a class="btn btn-quiet btn-sm" href="/listings">{{ ui.icon("box") }}<span>Browse all</span></a>
+    <a class="btn btn-quiet btn-sm" href="/listings">{{ ui.icon("box") }}<span>Alle ansehen</span></a>
   </div>
   {% if not recent %}
-    {{ cards.empty("Nothing found yet",
-        "Add a search and matches will start appearing here the moment they are listed. The first check seeds silently, so you are not greeted by a wall of notifications.") }}
+    {{ cards.empty("Noch nichts gefunden",
+        "Lege eine Suche an, und die Treffer erscheinen hier, sobald sie eingestellt werden. Die erste Abfrage läuft still – du wirst also nicht von einer Wand aus Meldungen empfangen.") }}
   {% else %}
     {{ cards.grid(recent) }}
   {% endif %}
 </section>
 
-{# --- What is being watched, at a glance ------------------------------------- #}
+{# --- Was gerade beobachtet wird, auf einen Blick ----------------------------------- #}
 {% if snapshot.searches %}
-<section aria-label="Watched searches">
+<section aria-label="Beobachtete Suchen">
   <div class="section-head">
-    <h2>Watched searches</h2>
+    <h2>Beobachtete Suchen</h2>
     <div class="spacer"></div>
-    <a class="btn btn-quiet btn-sm" href="/searches">Manage</a>
+    <a class="btn btn-quiet btn-sm" href="/searches">Verwalten</a>
   </div>
   <div class="card table-wrap">
     <table>
       <thead>
         <tr>
-          <th>Search</th>
-          <th>State</th>
-          <th>Last poll</th>
-          <th>Found</th>
-          <th><span class="visually-hidden">Actions</span></th>
+          <th>Suche</th>
+          <th>Status</th>
+          <th>Letzte Abfrage</th>
+          <th>Gefunden</th>
+          <th><span class="visually-hidden">Aktionen</span></th>
         </tr>
       </thead>
       <tbody>
@@ -146,9 +147,9 @@
             <div class="cell-note text-bad">{{ search.last_error[:90] }}</div>
             {% endif %}
           </td>
-          <td><span class="pill {{ search.state }}">{{ search.state }}</span></td>
+          <td><span class="pill {{ search.state }}">{{ search.state_label or search.state }}</span></td>
           <td class="muted nowrap">
-            {% if search.last_success_at %}{{ _age(search.last_success_at, now) }}{% else %}never{% endif %}
+            {% if search.last_success_at %}{{ _age(search.last_success_at, now) }}{% else %}nie{% endif %}
           </td>
           <td class="muted">{{ search.items_total }}</td>
           <td>
@@ -157,8 +158,8 @@
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="paused" value="{{ '0' if search.paused else '1' }}">
                 <button class="btn btn-quiet btn-sm" type="submit">
-                  {% if search.paused %}{{ ui.icon("play") }}<span>Resume</span>
-                  {% else %}{{ ui.icon("pause") }}<span>Pause</span>{% endif %}
+                  {% if search.paused %}{{ ui.icon("play") }}<span>Fortsetzen</span>
+                  {% else %}{{ ui.icon("pause") }}<span>Anhalten</span>{% endif %}
                 </button>
               </form>
             </div>
@@ -171,10 +172,10 @@
 </section>
 {% endif %}
 
-{# --- Add one ----------------------------------------------------------------- #}
-<section aria-label="Add a search">
+{# --- Eine anlegen ------------------------------------------------------------------- #}
+<section aria-label="Neue Suche">
   <div class="section-head">
-    <h2>Add a search</h2>
+    <h2>Neue Suche</h2>
   </div>
   <div class="card card-pad">
     {% include "_search_form.html" %}
@@ -186,11 +187,11 @@
 {% block lightbox %}
 {% if recent %}
 <div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true"
-     aria-label="Listing photos">
-  <button type="button" class="lb-close" aria-label="Close">×</button>
-  <button type="button" class="lb-prev" aria-label="Previous photo">‹</button>
-  <img id="lb-img" alt="Listing photo">
-  <button type="button" class="lb-next" aria-label="Next photo">›</button>
+     aria-label="Artikelbilder">
+  <button type="button" class="lb-close" aria-label="Schließen">×</button>
+  <button type="button" class="lb-prev" aria-label="Vorheriges Bild">‹</button>
+  <img id="lb-img" alt="Artikelbild">
+  <button type="button" class="lb-next" aria-label="Nächstes Bild">›</button>
   <span class="lb-counter" id="lb-counter"></span>
 </div>
 {% endif %}

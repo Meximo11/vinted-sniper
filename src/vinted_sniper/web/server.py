@@ -25,7 +25,7 @@ from collections import Counter
 from collections.abc import Awaitable, Callable, Iterator
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Final
 from urllib.parse import quote
 from xml.sax.saxutils import escape as xml_escape
 
@@ -35,6 +35,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import SecretStr
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from vinted_sniper.config import MIN_POLL_INTERVAL_S, Settings
 from vinted_sniper.db.repo import DeliveryStats, Query, Repo
@@ -161,7 +162,8 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
         supplied = submitted or request.headers.get(CSRF_HEADER)
         if not _csrf_ok(expected, supplied):
             raise HTTPException(
-                status_code=403, detail="this form has expired. Reload the page and try again."
+                status_code=403,
+                detail="Dieses Formular ist abgelaufen. Lade die Seite neu und versuche es erneut.",
             )
 
     # Declared after `guard` so an anonymous caller still gets a 401 telling it to sign
@@ -193,17 +195,27 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
             )
         return response
 
-    @app.exception_handler(HTTPException)
-    async def _html_errors(request: Request, exc: HTTPException) -> Response:
-        """A refused action gets a page, not a JSON blob: these URLs are typed by hand."""
+    @app.exception_handler(StarletteHTTPException)
+    async def _html_errors(request: Request, exc: StarletteHTTPException) -> Response:
+        """A refused action gets a page, not a JSON blob: these URLs are typed by hand.
+
+        Registered against Starlette's class rather than FastAPI's, which is a subclass of
+        it. The router raises the Starlette one for an unmatched path or a wrong method, and
+        a handler keyed on the subclass never sees those — a mistyped URL came back as raw
+        `{"detail": "Not Found"}` JSON instead of this page. The routes below still raise
+        FastAPI's, which this now catches too. The Accept check keeps the API JSON.
+        """
         accepts_html = "text/html" in request.headers.get("accept", "")
         if not accepts_html:
             return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
-        message = str(exc.detail)
         return TEMPLATES.TemplateResponse(
             request,
             "error.html",
-            {"message": message, "status_code": exc.status_code, "auth_enabled": token is not None},
+            {
+                "message": _error_message(str(exc.detail)),
+                "status_code": exc.status_code,
+                "auth_enabled": token is not None,
+            },
             status_code=exc.status_code,
         )
 
@@ -233,7 +245,7 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
             return TEMPLATES.TemplateResponse(
                 request,
                 "login.html",
-                {"error": "That token does not match."},
+                {"error": "Dieses Token passt nicht."},
                 status_code=401,
             )
         response = RedirectResponse("/", status_code=303)
@@ -474,7 +486,7 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
             return _redirect_with_error(str(exc), "/searches")
 
         if await repo.find_query_by_url(normalised) is not None:
-            return _redirect_with_error("that search is already being watched", "/searches")
+            return _redirect_with_error("diese Suche wird bereits beobachtet", "/searches")
 
         query_id = await repo.add_query(
             name=name.strip() or _name_from(params, tld),
@@ -487,7 +499,9 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
         )
         for destination_id in destination_ids or []:
             await repo.route(query_id, destination_id)
-        return _redirect_with_ok(f"Now watching “{name.strip() or _name_from(params, tld)}”.")
+        return _redirect_with_ok(
+            f"„{name.strip() or _name_from(params, tld)}“ wird jetzt beobachtet."
+        )
 
     @app.post("/searches/{query_id}/edit")
     async def edit_search(
@@ -502,7 +516,7 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
     ) -> Response:
         existing = await repo.get_query(query_id)
         if existing is None:
-            return _redirect_with_error("that search no longer exists", "/searches")
+            return _redirect_with_error("diese Suche existiert nicht mehr", "/searches")
 
         clean_name = name.strip() or existing.name
         await repo.update_query(
@@ -521,7 +535,7 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
         for destination_id in wanted:
             await repo.route(query_id, destination_id)
 
-        return _redirect_with_ok(f"Saved “{clean_name}”.", "/searches")
+        return _redirect_with_ok(f"„{clean_name}“ gespeichert.", "/searches")
 
     @app.post("/searches/{query_id}/pause")
     async def pause_search(
@@ -529,16 +543,16 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
     ) -> Response:
         await repo.set_paused(query_id, paused == "1")
         existing = await repo.get_query(query_id)
-        verb = "Resumed" if paused == "0" else "Paused"
-        name_of = existing.name if existing else "search"
-        return _redirect_with_ok(f"{verb} “{name_of}”.", "/searches")
+        verb = "Fortgesetzt" if paused == "0" else "Angehalten"
+        name_of = existing.name if existing else "Suche"
+        return _redirect_with_ok(f"„{name_of}“ {verb.lower()}.", "/searches")
 
     @app.post("/searches/{query_id}/delete")
     async def delete_search(query_id: int, _: None = guard, __: None = csrf) -> Response:
         existing = await repo.get_query(query_id)
         await repo.delete_query(query_id)
         return _redirect_with_ok(
-            f"Stopped watching “{existing.name if existing else 'search'}”.", "/searches"
+            f"„{existing.name if existing else 'Suche'}“ wird nicht mehr beobachtet.", "/searches"
         )
 
     # --- Filter data for the advanced search builder -------------------------------
@@ -606,12 +620,12 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
         match kind:
             case "discord":
                 if not target.startswith("https://"):
-                    return _redirect_with_error("paste the full Discord webhook URL")
+                    return _redirect_with_error("die vollständige Discord-Webhook-URL einfügen")
                 config = {"webhook_url": target}
             case "telegram":
                 if not target:
                     return _redirect_with_error(
-                        "add the chat id, or use the pairing link from the command line"
+                        "die Chat-ID angeben oder den Verknüpfungslink von der Kommandozeile nutzen"
                     )
                 config = {"chat_id": target}
             case "webhook":
@@ -619,7 +633,7 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
             case "ntfy":
                 config = {"topic": target}
             case _:
-                return _redirect_with_error(f"unknown destination type {kind!r}")
+                return _redirect_with_error(f"unbekannter Empfängertyp {kind!r}")
 
         await repo.add_destination(kind=kind, name=name.strip() or kind, config=config)
         return RedirectResponse("/", status_code=303)
@@ -627,9 +641,9 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
     @app.post("/destinations/{destination_id}/delete")
     async def delete_destination(destination_id: int, _: None = guard, __: None = csrf) -> Response:
         existing = await repo.get_destination(destination_id)
-        await repo.deactivate_destination(destination_id, "removed from the dashboard")
+        await repo.deactivate_destination(destination_id, "über das Dashboard entfernt")
         return _redirect_with_ok(
-            f"Removed “{existing.name if existing else 'destination'}”.", "/destinations"
+            f"„{existing.name if existing else 'Empfänger'}“ entfernt.", "/destinations"
         )
 
     @app.post("/destinations/{destination_id}/reactivate")
@@ -638,7 +652,7 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
     ) -> Response:
         await repo.reactivate_destination(destination_id)
         return _redirect_with_ok(
-            "Reconnected. It will start receiving matches again.", "/destinations"
+            "Wieder verbunden. Es werden wieder Treffer zugestellt.", "/destinations"
         )
 
     @app.post("/destinations/{destination_id}/notify-status")
@@ -649,8 +663,8 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
         __: None = csrf,
     ) -> Response:
         await repo.set_destination_notify_status(destination_id, notify_status == "1")
-        verb = "will get" if notify_status == "1" else "will no longer get"
-        return _redirect_with_ok(f"{verb} operational notices.", "/destinations")
+        verb = "erhält" if notify_status == "1" else "erhält keine"
+        return _redirect_with_ok(f"Empfänger {verb} Statusmeldungen.", "/destinations")
 
     @app.post("/searches/{query_id}/routes")
     async def set_routes(
@@ -665,7 +679,7 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
             await repo.unroute(query_id, destination_id)
         for destination_id in wanted:
             await repo.route(query_id, destination_id)
-        return _redirect_with_ok("Routing updated.", "/searches")
+        return _redirect_with_ok("Zuordnung aktualisiert.", "/searches")
 
     # --- RSS -----------------------------------------------------------------------
 
@@ -683,6 +697,24 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
     return app
 
 
+# The router writes its own English into the exception when it turns a request away
+# before a route ever runs. Every other message this app raises is already German, so
+# only these exact phrases are swapped: an app-raised detail is passed through untouched
+# however it happens to read.
+_STATUS_PHRASES: Final[dict[str, str]] = {
+    "Not Found": "Diese Seite gibt es nicht.",
+    "Method Not Allowed": "Diese Seite beantwortet keine solche Anfrage.",
+    "Unauthorized": "Nicht angemeldet.",
+    "Forbidden": "Dafür fehlt die Berechtigung.",
+    "Internal Server Error": "Da ist etwas schiefgelaufen.",
+    "Service Unavailable": "Gerade nicht erreichbar.",
+}
+
+
+def _error_message(detail: str) -> str:
+    return _STATUS_PHRASES.get(detail, detail)
+
+
 def _form_context(
     settings: Settings, snapshot: health.Snapshot, taxonomy: Taxonomy | None
 ) -> dict[str, Any]:
@@ -693,8 +725,9 @@ def _form_context(
         "default_interval": settings.poll_default_interval_s,
         "builder_enabled": taxonomy is not None,
         "known_tlds": sorted(urls.KNOWN_TLDS),
-        # Open the builder on the site the user already watches most.
-        "default_tld": Counter(watched_tlds).most_common(1)[0][0] if watched_tlds else "fr",
+        # Open the builder on the site the user already watches most. Germany first when
+        # there is nothing to go on: the tool is built and translated for vinted.de.
+        "default_tld": Counter(watched_tlds).most_common(1)[0][0] if watched_tlds else "de",
     }
 
 
@@ -720,7 +753,7 @@ def _delivery_view(stats: DeliveryStats, now: int) -> dict[str, Any]:
         "sent": stats.sent,
         "failed": stats.failed,
         "success_rate": stats.success_rate,
-        "latency": f"{latency:.1f}s" if latency is not None else None,
+        "latency": f"{latency:.1f} s".replace(".", ",") if latency is not None else None,
         "last_sent": _age(
             stats.last_queued_at if stats.sent else None,
             now,
@@ -728,6 +761,28 @@ def _delivery_view(stats: DeliveryStats, now: int) -> dict[str, Any]:
         if stats.sent
         else None,
     }
+
+
+# How the interface writes money. Germany puts the symbol after the number and separates
+# thousands with a dot and decimals with a comma; "10.00 EUR" reads as machine output to
+# anyone this app was written for. Currencies that are not the euro keep their ISO code,
+# because "EUR" is the only part of an unfamiliar one that is unambiguous.
+_EURO_SIGN: Final = "€"
+_GROUP_SIZE: Final = 3
+
+
+def _money(amount: float, currency: str) -> str:
+    """One price, written the way it is written in Germany."""
+    code = (currency or "").strip().upper()
+    whole, _, frac = f"{amount:.2f}".partition(".")
+    grouped = ""
+    while len(whole) > _GROUP_SIZE:
+        grouped = "." + whole[-_GROUP_SIZE:] + grouped
+        whole = whole[:-_GROUP_SIZE]
+    number = f"{whole}{grouped},{frac}"
+    if code in ("", "EUR"):
+        return f"{number} {_EURO_SIGN}"
+    return f"{number} {code}"
 
 
 def _listing_views(rows: list[Any], now: int) -> list[dict[str, Any]]:
@@ -752,12 +807,12 @@ def _listing_views(rows: list[Any], now: int) -> list[dict[str, Any]]:
         stars = round(row["seller_rating"] * 50) / 10 if row["seller_rating"] is not None else None
         views.append(
             {
-                "title": row["title"] or f"Listing {row['item_id']}",
+                "title": row["title"] or f"Artikel {row['item_id']}",
                 "url": row["url"],
                 "photos": photos,
-                "price": f"{price:.2f} {currency}".strip() if price is not None else None,
+                "price": _money(price, currency) if price is not None else None,
                 "total_price": (
-                    f"{total:.2f} {currency}".strip()
+                    _money(total, currency)
                     if total is not None and total != price
                     else None
                 ),
@@ -781,15 +836,15 @@ def _listing_views(rows: list[Any], now: int) -> list[dict[str, Any]]:
 def _age(then: int | None, now: int) -> str:
     """A found-time a human scans, not arithmetic they have to do."""
     if then is None:
-        return "never"
+        return "nie"
     seconds = max(now - then, 0)
     if seconds < 60:  # noqa: PLR2004
-        return f"{seconds}s ago"
+        return f"vor {seconds} s"
     if seconds < 3600:  # noqa: PLR2004
-        return f"{seconds // 60}m ago"
+        return f"vor {seconds // 60} Min."
     if seconds < 86400:  # noqa: PLR2004
-        return f"{seconds // 3600}h ago"
-    return f"{seconds // 86400}d ago"
+        return f"vor {seconds // 3600} Std."
+    return f"vor {seconds // 86400} T."
 
 
 def _positive_int(raw: str) -> int:
@@ -822,7 +877,7 @@ def _decimal_or_none(raw: str) -> Decimal | None:
 def _name_from(params: dict[str, str], tld: str) -> str:
     if text := params.get("search_text"):
         return f"{text} ({tld})"
-    return f"vinted.{tld} search"
+    return f"vinted.{tld} Suche"
 
 
 def _rss_feed(title: str, rows: list[Any]) -> str:

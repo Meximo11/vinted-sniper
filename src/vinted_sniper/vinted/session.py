@@ -131,24 +131,26 @@ class SessionManager:
             )
         except TransportError as exc:
             self._proxies.bench(proxy, QUARANTINE_NETWORK_S, "could not connect")
-            raise NetworkError(f"could not reach {root}: {exc}") from exc
+            raise NetworkError(f"{root} nicht erreichbar: {exc}") from exc
 
         if response.status_code == HTTPStatus.FORBIDDEN:
             self._proxies.bench(proxy, QUARANTINE_BLOCKED_S, "refused at the homepage")
             raise BlockedError(
-                f"vinted.{tld} refused the connection before we could get a session. "
-                "This is usually the address you are coming from rather than the app; "
-                "see docs/troubleshooting.md."
+                f"vinted.{tld} hat die Verbindung abgewiesen, bevor eine Sitzung "
+                "zustande kam. Das liegt meist an deiner Adresse und nicht an der App; "
+                "siehe docs/troubleshooting.md."
             )
         if response.status_code >= HTTPStatus.BAD_REQUEST:
-            raise NetworkError(f"vinted.{tld} answered {response.status_code} on the homepage")
+            raise NetworkError(
+                f"vinted.{tld} antwortet auf der Startseite mit {response.status_code}"
+            )
 
         cookies = dict(response.cookies)
         if SESSION_COOKIE not in cookies:
             raise BlockedError(
-                f"vinted.{tld} served a page but set no {SESSION_COOKIE} cookie. "
-                "Run the check in docs/troubleshooting.md to see whether your address is "
-                "being challenged."
+                f"vinted.{tld} hat eine Seite ausgeliefert, aber kein Cookie "
+                f"{SESSION_COOKIE} gesetzt. Prüfe docs/troubleshooting.md, um zu sehen, "
+                "ob deine Adresse herausgefordert wird."
             )
 
         session = Session(

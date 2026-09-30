@@ -49,14 +49,14 @@
   async function loadTree() {
     const cats = $("b-cats");
     cats.replaceChildren(
-      msg("Loading categories… the first time on a site takes a few seconds."),
+      msg("Kategorien werden geladen … beim ersten Mal für eine Seite dauert das ein paar Sekunden."),
     );
     try {
       const data = await fetchJSON(`/api/filters/${tld()}/categories`);
       state.tree = data.categories;
       renderCats();
     } catch (err) {
-      cats.replaceChildren(msg(`Couldn't load categories: ${err.message}`));
+      cats.replaceChildren(msg(`Kategorien konnten nicht geladen werden: ${err.message}`));
     }
   }
 
@@ -66,7 +66,7 @@
     const all = document.createElement("button");
     all.type = "button";
     all.className = "crumb";
-    all.textContent = "All categories";
+    all.textContent = "Alle Kategorien";
     all.onclick = () => {
       state.path = [];
       onCategoryChange();
@@ -93,7 +93,7 @@
     const node = selectedCat();
     const children = node ? node.children : state.tree;
     if (!children.length) {
-      cats.append(msg("No further subcategories."));
+      cats.append(msg("Keine weiteren Unterkategorien."));
       return;
     }
     for (const child of children) {
@@ -146,7 +146,7 @@
         `/api/filters/${tld()}/brands?q=${encodeURIComponent(q)}${scope}`,
       );
       list.replaceChildren();
-      if (!data.brands.length) list.append(msg("No brands match."));
+      if (!data.brands.length) list.append(msg("Keine Marke passt dazu."));
       for (const brand of data.brands) {
         const row = document.createElement("button");
         row.type = "button";
@@ -156,7 +156,7 @@
         if (brand.count) {
           const count = document.createElement("span");
           count.className = "muted";
-          count.textContent = `${new Intl.NumberFormat().format(brand.count)} items`;
+          count.textContent = `${new Intl.NumberFormat("de-DE").format(brand.count)} Artikel`;
           row.append(count);
         }
         row.onclick = () => {
@@ -185,7 +185,7 @@
       const remove = document.createElement("button");
       remove.type = "button";
       remove.textContent = "×";
-      remove.setAttribute("aria-label", `remove ${title}`);
+      remove.setAttribute("aria-label", `${title} entfernen`);
       remove.onclick = () => {
         state.brands.delete(id);
         renderBrandChips();
@@ -199,21 +199,21 @@
   // --- Condition, colour, size ----------------------------------------------------
 
   async function loadFacet(code, container) {
-    container.replaceChildren(msg("Loading…"));
+    container.replaceChildren(msg("Wird geladen …"));
     try {
       const cat = selectedCat();
       const scope = code === "size" && cat ? `?catalog_ids=${cat.id}` : "";
       const data = await fetchJSON(`/api/filters/${tld()}/facets/${code}${scope}`);
       renderFacet(code, container, data.options);
     } catch (err) {
-      container.replaceChildren(msg(`Couldn't load: ${err.message}`));
+      container.replaceChildren(msg(`Konnte nicht geladen werden: ${err.message}`));
     }
   }
 
   function renderFacet(code, container, options) {
     container.replaceChildren();
     if (!options.length) {
-      container.append(msg("Nothing to choose here."));
+      container.append(msg("Hier gibt es nichts auszuwählen."));
       return;
     }
     let group = null;
@@ -238,7 +238,7 @@
       if (option.count) {
         const count = document.createElement("span");
         count.className = "count";
-        count.textContent = new Intl.NumberFormat().format(option.count);
+        count.textContent = new Intl.NumberFormat("de-DE").format(option.count);
         label.append(count);
       }
       container.append(label);
@@ -275,10 +275,10 @@
       link.href = url;
       link.target = "_blank";
       link.rel = "noreferrer";
-      link.textContent = "Check this search on Vinted first ↗";
+      link.textContent = "Diese Suche zuerst auf Vinted prüfen ↗";
       preview.append(link);
     } else {
-      preview.textContent = "Pick a filter or two and the URL above fills itself in.";
+      preview.textContent = "Wähle ein paar Filter – die URL oben füllt sich von selbst.";
     }
     // Suggest a name, but never fight the user over one they typed themselves.
     if (nameInput.value === nameAuto) {
@@ -299,7 +299,9 @@
   toggle.addEventListener("click", () => {
     builder.hidden = !builder.hidden;
     toggle.setAttribute("aria-expanded", String(!builder.hidden));
-    toggle.textContent = builder.hidden ? "Build a search instead ▾" : "Hide the builder ▴";
+    toggle.textContent = builder.hidden
+      ? "Selbst zusammenstellen ▾"
+      : "Aufbauassistent ausblenden ▴";
     urlInput.readOnly = !builder.hidden;
     if (!builder.hidden && !opened) {
       opened = true;

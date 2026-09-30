@@ -1,15 +1,14 @@
-{% import "_icons.html" as ui %}
-<!doctype html>
-<html lang="en">
+{% import "_icons.html" as ui %}<!doctype html>
+<html lang="de">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark light">
-  <title>Sign in · vinted-sniper</title>
+  <meta name="color-scheme" content="light dark">
+  <title>Anmelden · vinted-sniper</title>
   <link rel="stylesheet" href="/static/app.css">
 </head>
-{# No app shell here. Every link in the sidebar would bounce straight back to this
-   page, which reads as a broken navigation rather than a locked one. #}
+{# Keine App-Hülle hier. Jeder Link in der Seitenleiste würde direkt auf diese Seite
+   zurückführen, was sich wie kaputte Navigation liest, nicht wie eine gesperrte. #}
 <body class="centered-page">
   <main class="notice-card">
     <div class="brand brand-centered">
@@ -17,7 +16,7 @@
       <span>vinted-sniper</span>
     </div>
 
-    <h1>Sign in</h1>
+    <h1>Anmelden</h1>
 
     {% if error %}
     <div class="flash flash-error" role="alert">
@@ -27,19 +26,19 @@
 
     <form method="post" action="/login" class="login-form">
       <div class="field">
-        <label for="access_token">Access token</label>
+        <label for="access_token">Zugriffstoken</label>
         <input type="password" id="access_token" name="access_token" autofocus
                autocomplete="current-password" required>
-        <p class="hint">The value of <code class="mono">VINTED_SNIPER_WEB_AUTH_TOKEN</code>.</p>
+        <p class="hint">Der Wert von <code class="mono">VINTED_SNIPER_WEB_AUTH_TOKEN</code>.</p>
       </div>
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Sign in</button>
+        <button type="submit" class="btn btn-primary">Anmelden</button>
       </div>
     </form>
 
     <p class="hint">
-      The dashboard holds your webhook URLs and chat ids, so it is worth a password
-      before it goes anywhere but your own machine.
+      Das Dashboard zeigt deine Webhook-URLs und Chat-IDs. Deshalb lohnt sich ein Kennwort,
+      bevor es irgendwo hingeht, wo es nicht auf deinem eigenen Rechner liegt.
     </p>
   </main>
 </body>

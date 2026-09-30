@@ -1,15 +1,30 @@
 {% import "_icons.html" as ui %}<!doctype html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark light">
+  <meta name="color-scheme" content="light dark">
   <title>{% block title %}vinted-sniper{% endblock %}</title>
+  {# Runs before the stylesheet so the page never paints in the wrong theme and snaps to
+     the right one a frame later. It is inline on purpose: an external script is a request,
+     and a request is a chance to flash. #}
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("vinted-sniper-theme");
+        if (stored === "light" || stored === "dark") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      } catch (error) {
+        /* Private mode, or storage disabled. The system preference still applies. */
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="/static/app.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><text y='19' font-size='19'>🎯</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230a7076'/><circle cx='16' cy='16' r='7' fill='none' stroke='white' stroke-width='2'/><circle cx='16' cy='16' r='2' fill='white'/></svg>">
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to content</a>
+  <a class="skip-link" href="#main">Zum Inhalt springen</a>
 
   <div class="app">
     <div class="nav-scrim" hidden></div>
@@ -20,39 +35,54 @@
         <span>vinted-sniper</span>
       </a>
 
-      <nav class="nav" aria-label="Sections">
+      <nav class="nav" aria-label="Bereiche">
         <a class="nav-link" href="/" {% if nav == "dashboard" %}aria-current="page"{% endif %}>
-          {{ ui.icon("activity") }}<span>Dashboard</span>
+          {{ ui.icon("activity") }}<span>Übersicht</span>
         </a>
         <a class="nav-link" href="/searches" {% if nav == "searches" %}aria-current="page"{% endif %}>
-          {{ ui.icon("search") }}<span>Searches</span>
+          {{ ui.icon("search") }}<span>Suchen</span>
           {% if search_counts %}<span class="count">{{ search_counts.active }}</span>{% endif %}
         </a>
         <a class="nav-link" href="/destinations" {% if nav == "destinations" %}aria-current="page"{% endif %}>
-          {{ ui.icon("bell") }}<span>Notifications</span>
+          {{ ui.icon("bell") }}<span>Benachrichtigungen</span>
           {% if active_destinations is defined %}
             <span class="count">{{ active_destinations }}</span>
           {% endif %}
         </a>
         <a class="nav-link" href="/listings" {% if nav == "listings" %}aria-current="page"{% endif %}>
-          {{ ui.icon("box") }}<span>Listings</span>
+          {{ ui.icon("box") }}<span>Artikel</span>
         </a>
         <a class="nav-link" href="/activity" {% if nav == "activity" %}aria-current="page"{% endif %}>
-          {{ ui.icon("clock") }}<span>Activity</span>
+          {{ ui.icon("clock") }}<span>Aktivität</span>
         </a>
       </nav>
 
       <div class="sidebar-foot">
+        <div class="theme-switch" role="group" aria-label="Erscheinungsbild">
+          <button type="button" class="theme-option" data-theme-choice="light"
+                  aria-pressed="false" title="Hell">
+            {{ ui.icon("sun") }}<span class="visually-hidden">Hell</span>
+          </button>
+          <button type="button" class="theme-option" data-theme-choice="dark"
+                  aria-pressed="false" title="Dunkel">
+            {{ ui.icon("moon") }}<span class="visually-hidden">Dunkel</span>
+          </button>
+          <button type="button" class="theme-option" data-theme-choice="system"
+                  aria-pressed="false" title="Wie das System">
+            {{ ui.icon("monitor") }}<span class="visually-hidden">Wie das System</span>
+          </button>
+        </div>
+
         {% if snapshot %}
         <div class="sidebar-status {% if not snapshot.alive %}is-bad{% endif %}">
           <div class="label">
-            {% if snapshot.alive %}{{ ui.icon("check") }} Running{% else %}{{ ui.icon("alert") }} Not responding{% endif %}
+            {% if snapshot.alive %}{{ ui.icon("check") }} Läuft{% else %}{{ ui.icon("alert") }} Antwortet nicht{% endif %}
           </div>
           <div class="sidebar-status-detail">
             {% if snapshot.queued_notifications %}
-              {{ snapshot.queued_notifications }} notification{{ 's' if snapshot.queued_notifications != 1 }} queued
+              {{ snapshot.queued_notifications }} Benachrichtigung{{ 'en' if snapshot.queued_notifications != 1 }} wart{{ 'et' if snapshot.queued_notifications == 1 else 'en' }}
             {% else %}
-              Nothing waiting to send
+              Nichts wartet auf Versand
             {% endif %}
           </div>
         </div>
@@ -61,7 +91,7 @@
         <form method="post" action="/logout" class="inline">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <button class="btn btn-quiet btn-sm" type="submit">
-            {{ ui.icon("logout") }}<span>Sign out</span>
+            {{ ui.icon("logout") }}<span>Abmelden</span>
           </button>
         </form>
         {% endif %}
@@ -70,7 +100,7 @@
 
     <div class="main">
       <header class="topbar">
-        <button class="menu-toggle" type="button" aria-expanded="false" aria-label="Open navigation">
+        <button class="menu-toggle" type="button" aria-expanded="false" aria-label="Navigation öffnen">
           {{ ui.icon("menu") }}
         </button>
         <h1>{% block heading %}{{ self.title() }}{% endblock %}</h1>

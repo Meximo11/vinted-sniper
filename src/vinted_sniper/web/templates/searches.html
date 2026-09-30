@@ -1,38 +1,38 @@
 {% extends "base.html" %}
 {% import "_icons.html" as ui %}
 
-{% block title %}Searches · vinted-sniper{% endblock %}
-{% block heading %}Searches{% endblock %}
+{% block title %}Suchen · vinted-sniper{% endblock %}
+{% block heading %}Suchen{% endblock %}
 
 {% block content %}
 
-<section aria-label="Saved searches">
+<section aria-label="Gespeicherte Suchen">
   <div class="section-head">
-    <h2>{{ search_counts.total }} saved</h2>
+    <h2>{{ search_counts.total }} gespeichert</h2>
     <div class="spacer"></div>
     <span class="muted">
-      {{ search_counts.active }} running, {{ search_counts.paused }} paused
+      {{ search_counts.active }} aktiv, {{ search_counts.paused }} pausiert
     </span>
   </div>
 
   {% if not snapshot.searches %}
     <div class="card empty">
       {{ ui.icon("search") }}
-      <h3>No searches yet</h3>
-      <p>Set up the search you want on Vinted, then paste the address bar into the box
-         below. Or use the builder and skip the URL entirely.</p>
+      <h3>Noch keine Suchen</h3>
+      <p>Stelle die gewünschte Suche auf Vinted zusammen und kopiere dann die Adressezeile
+         in das Feld unten. Oder nutze den Aufbauassistenten und lass die URL ganz weg.</p>
     </div>
   {% else %}
   <div class="card table-wrap">
     <table>
       <thead>
         <tr>
-          <th>Search</th>
-          <th>State</th>
-          <th>Last poll</th>
-          <th>Newest</th>
-          <th>Found</th>
-          <th><span class="visually-hidden">Actions</span></th>
+          <th>Suche</th>
+          <th>Status</th>
+          <th>Letzte Abfrage</th>
+          <th>Neuester Treffer</th>
+          <th>Gefunden</th>
+          <th><span class="visually-hidden">Aktionen</span></th>
         </tr>
       </thead>
       <tbody>
@@ -42,18 +42,18 @@
           <td>
             <div class="cell-title">{{ search.name }}</div>
             <div class="cell-note">
-              vinted.{{ search.tld }}{% if routes %}, {{ routes | length }} destination{{ 's' if routes | length != 1 }}{% endif %}
+              vinted.{{ search.tld }}{% if routes %}, {{ routes | length }} Empfänger{% endif %}
             </div>
             {% if search.last_error %}
             <div class="cell-note text-bad">{{ search.last_error[:90] }}</div>
             {% endif %}
           </td>
-          <td><span class="pill {{ search.state }}">{{ search.state }}</span></td>
+          <td><span class="pill {{ search.state }}">{{ search.state_label or search.state }}</span></td>
           <td class="muted nowrap">
-            {% if search.last_success_at %}{{ _age(search.last_success_at, now) }}{% else %}never{% endif %}
+            {% if search.last_success_at %}{{ _age(search.last_success_at, now) }}{% else %}nie{% endif %}
           </td>
           <td class="muted nowrap">
-            {% if search.newest_listing_at %}{{ _age(search.newest_listing_at, now) }}{% else %}none yet{% endif %}
+            {% if search.newest_listing_at %}{{ _age(search.newest_listing_at, now) }}{% else %}noch keiner{% endif %}
           </td>
           <td class="muted">{{ search.items_total }}</td>
           <td>
@@ -61,21 +61,21 @@
               <button type="button" class="btn btn-quiet btn-sm"
                       data-disclosure="edit-{{ search.query_id }}"
                       aria-expanded="false" aria-controls="edit-{{ search.query_id }}">
-                {{ ui.icon("pencil") }}<span>Edit</span>
+                {{ ui.icon("pencil") }}<span>Bearbeiten</span>
               </button>
               <form method="post" action="/searches/{{ search.query_id }}/pause" class="inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="paused" value="{{ '0' if search.paused else '1' }}">
                 <button class="btn btn-quiet btn-sm" type="submit">
-                  {% if search.paused %}{{ ui.icon("play") }}<span>Resume</span>
-                  {% else %}{{ ui.icon("pause") }}<span>Pause</span>{% endif %}
+                  {% if search.paused %}{{ ui.icon("play") }}<span>Fortsetzen</span>
+                  {% else %}{{ ui.icon("pause") }}<span>Anhalten</span>{% endif %}
                 </button>
               </form>
               <form method="post" action="/searches/{{ search.query_id }}/delete" class="inline"
-                    data-confirm="Stop watching “{{ search.name }}”? The listings already found are kept, but anything still queued for it is cancelled.">
+                    data-confirm="„{{ search.name }}“ wirklich nicht mehr beobachten? Die bereits gefundenen Artikel bleiben erhalten, alles noch Wartende wird abgebrochen.">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button class="btn btn-danger btn-sm" type="submit">
-                  {{ ui.icon("trash") }}<span>Delete</span>
+                  {{ ui.icon("trash") }}<span>Löschen</span>
                 </button>
               </form>
             </div>
@@ -93,28 +93,28 @@
                            value="{{ search.name }}">
                   </div>
                   <div class="field">
-                    <label for="interval-{{ search.query_id }}">Check every (seconds)</label>
+                    <label for="interval-{{ search.query_id }}">Abfrageintervall (Sekunden)</label>
                     <input type="text" id="interval-{{ search.query_id }}" name="interval"
                            inputmode="numeric" value="{{ details[search.query_id].poll_interval_s }}">
-                    <p class="hint">Minimum 10s.</p>
+                    <p class="hint">Mindestens 10 s.</p>
                   </div>
                   <div class="field">
-                    <label for="price-{{ search.query_id }}">Max total price</label>
+                    <label for="price-{{ search.query_id }}">Maximaler Gesamtpreis</label>
                     <input type="text" id="price-{{ search.query_id }}" name="max_total_price"
                            inputmode="decimal"
                            value="{{ details[search.query_id].max_total_price or '' }}">
-                    <p class="hint">What you actually pay, buyer protection included.</p>
+                    <p class="hint">Was du wirklich zahlst, inklusive Käuferschutz.</p>
                   </div>
                   <div class="field">
-                    <label for="banned-{{ search.query_id }}">Exclude words</label>
+                    <label for="banned-{{ search.query_id }}">Ausgeschlossene Wörter</label>
                     <input type="text" id="banned-{{ search.query_id }}" name="banned_keywords"
                            value="{{ details[search.query_id].banned_keywords | join(', ') }}">
-                    <p class="hint">Comma separated.</p>
+                    <p class="hint">Mit Komma getrennt.</p>
                   </div>
 
                   {% if destinations %}
                   <div class="field span-all">
-                    <span class="label">Send matches to</span>
+                    <span class="label">Treffer senden an</span>
                     <div class="check-grid">
                       {% for destination in destinations %}
                       <label class="check">
@@ -122,7 +122,7 @@
                                {% if destination.id in routes %}checked{% endif %}>
                         {{ destination.name }}
                         {% if not destination.active %}
-                        <span class="muted">(off)</span>
+                        <span class="muted">(aus)</span>
                         {% endif %}
                       </label>
                       {% endfor %}
@@ -132,13 +132,13 @@
                 </div>
 
                 <p class="section-note">
-                  The search itself (site, terms and filters) comes from
-                  <a href="{{ details[search.query_id].url }}" target="_blank" rel="noreferrer">the Vinted URL</a>.
-                  To change what it looks for, delete this search and add a new one.
+                  Die Suche selbst (Seite, Suchbegriffe und Filter) stammt aus
+                  <a href="{{ details[search.query_id].url }}" target="_blank" rel="noreferrer">der Vinted-URL</a>.
+                  Um zu ändern, wonach sie sucht, löschst du diese Suche und legst eine neue an.
                 </p>
 
                 <div class="form-actions">
-                  <button type="submit" class="btn btn-primary btn-sm">Save changes</button>
+                  <button type="submit" class="btn btn-primary btn-sm">Änderungen speichern</button>
                 </div>
               </form>
             </div>
@@ -150,15 +150,16 @@
   </div>
 
   <p class="section-note">
-    A search goes stale when it stops seeing new listings while others on the same site
-    keep finding them. That is usually a session that needs replacing, which happens on its own.
+    Eine Suche wird alt, wenn sie keine neuen Artikel mehr sieht, während andere auf
+    derselben Seite weiterfinden. Meist ist das eine abgelaufene Sitzung, die sich von
+    allein erneuert.
   </p>
   {% endif %}
 </section>
 
-<section id="new" aria-label="Add a search">
+<section id="neu" aria-label="Neue Suche">
   <div class="section-head">
-    <h2>Add a search</h2>
+    <h2>Neue Suche</h2>
   </div>
   <div class="card card-pad form-narrow">
     {% include "_search_form.html" %}

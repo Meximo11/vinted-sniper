@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% import "_icons.html" as ui %}
 
-{% block title %}Notifications · vinted-sniper{% endblock %}
-{% block heading %}Notifications{% endblock %}
+{% block title %}Benachrichtigungen · vinted-sniper{% endblock %}
+{% block heading %}Benachrichtigungen{% endblock %}
 
 {% macro kind_icon(kind) -%}
   {%- if kind == "telegram" -%}{{ ui.icon("telegram") }}
@@ -11,21 +11,29 @@
   {%- else -%}{{ ui.icon("webhook") }}{%- endif -%}
 {%- endmacro %}
 
+{# The transport's own name, in the language of the interface rather than the database. #}
+{% macro kind_name(kind) -%}
+  {%- if kind == "telegram" -%}Telegram
+  {%- elif kind == "discord" -%}Discord
+  {%- elif kind == "ntfy" -%}ntfy
+  {%- else -%}Webhook{%- endif -%}
+{%- endmacro %}
+
 {% block content %}
 
-<section aria-label="Configured destinations">
+<section aria-label="Eingerichtete Empfänger">
   <div class="section-head">
-    <h2>{{ destinations | length }} configured</h2>
+    <h2>{{ destinations | length }} eingerichtet</h2>
     <div class="spacer"></div>
-    <span class="muted">{{ active_destinations }} connected</span>
+    <span class="muted">{{ active_destinations }} verbunden</span>
   </div>
 
   {% if not destinations %}
     <div class="card empty">
       {{ ui.icon("bell") }}
-      <h3>Nowhere to send matches yet</h3>
-      <p>Add a destination below. Until you do, listings are still found and stored, they
-         just have nowhere to go.</p>
+      <h3>Noch kein Empfänger</h3>
+      <p>Lege unten einen Empfänger an. Bis dahin werden Artikel weiterhin gefunden und
+         gespeichert – sie haben nur niemanden, zu dem sie gehen können.</p>
     </div>
   {% else %}
   <div class="dest-grid">
@@ -36,14 +44,14 @@
         <span class="dest-icon {{ destination.kind }}">{{ kind_icon(destination.kind) }}</span>
         <div>
           <h3>{{ destination.name }}</h3>
-          <div class="kind-label">{{ destination.kind }}</div>
+          <div class="kind-label">{{ kind_name(destination.kind) }}</div>
         </div>
         {% if destination.is_awaiting_pairing %}
-          <span class="pill starting">waiting</span>
+          <span class="pill starting">wartet</span>
         {% elif destination.active %}
-          <span class="pill ok">connected</span>
+          <span class="pill ok">verbunden</span>
         {% else %}
-          <span class="pill disabled">off</span>
+          <span class="pill disabled">aus</span>
         {% endif %}
       </div>
 
@@ -53,40 +61,41 @@
       <div class="reason">{{ destination.deactivated_reason }}</div>
       {% elif destination.is_awaiting_pairing %}
       <p class="hint">
-        Waiting for someone to open the pairing link. Notifications queue until then and
-        expire on their own, so this is not an error.
+        Es wartet jemand darauf, den Verknüpfungslink zu öffnen. Benachrichtigungen werden
+        so lange in die Warteschlange gestellt und laufen von selbst ab – das ist kein Fehler.
       </p>
       {% endif %}
 
       {% if destination.failure_count %}
       <p class="hint text-warn">
-        {{ destination.failure_count }} failed send{{ 's' if destination.failure_count != 1 }} in a row.
+        {{ destination.failure_count }} Send{{ 'e' if destination.failure_count == 1 else 'en' }} in Folge fehlgeschlagen.
       </p>
       {% endif %}
 
       {% if stats and stats.sent %}
       <dl class="delivery delivery-{{ stats.health }}">
         <div>
-          <dt>Arrived</dt>
-          <dd>{{ stats.sent }}{% if stats.failed %} of {{ stats.sent + stats.failed }}{% endif %}</dd>
+          <dt>Angekommen</dt>
+          <dd>{{ stats.sent }}{% if stats.failed %} von {{ stats.sent + stats.failed }}{% endif %}</dd>
         </div>
         {% if stats.latency %}
         <div>
-          <dt>Typical wait</dt>
+          <dt>Typische Wartezeit</dt>
           <dd>{{ stats.latency }}</dd>
         </div>
         {% endif %}
         {% if stats.last_sent %}
         <div>
-          <dt>Last one</dt>
+          <dt>Zuletzt</dt>
           <dd>{{ stats.last_sent }}</dd>
         </div>
         {% endif %}
       </dl>
       {% elif stats and stats.failed %}
       <p class="delivery-note">
-        {{ stats.failed }} notification{{ 's' if stats.failed != 1 }} could not be delivered
-        in the last 7 days.
+        {{ stats.failed }} Benachrichtigung{{ 'en' if stats.failed != 1 else '' }}
+        {{ 'konnte' if stats.failed == 1 else 'konnten' }} in den letzten 7 Tagen
+        nicht zugestellt werden.
       </p>
       {% endif %}
 
@@ -96,28 +105,28 @@
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <input type="hidden" name="notify_status" value="{{ '0' if destination.notify_status else '1' }}">
           <button class="btn btn-quiet btn-sm" type="submit">
-            {{ ui.icon("info") }}<span>{{ 'Stop status notices' if destination.notify_status else 'Send status notices' }}</span>
+            {{ ui.icon("info") }}<span>{{ 'Statusmeldungen abstellen' if destination.notify_status else 'Statusmeldungen senden' }}</span>
           </button>
         </form>
         <form method="post" action="/destinations/{{ destination.id }}/delete" class="inline"
-              data-confirm="Stop sending to “{{ destination.name }}”? Anything still queued for it is cancelled.">
+              data-confirm="Nicht mehr an „{{ destination.name }}“ senden? Alles, was dafür noch in der Warteschlange liegt, wird abgebrochen.">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <button class="btn btn-danger btn-sm" type="submit">
-            {{ ui.icon("trash") }}<span>Remove</span>
+            {{ ui.icon("trash") }}<span>Entfernen</span>
           </button>
         </form>
         {% else %}
         <form method="post" action="/destinations/{{ destination.id }}/reactivate" class="inline">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <button class="btn btn-sm" type="submit">
-            {{ ui.icon("check") }}<span>Reconnect</span>
+            {{ ui.icon("check") }}<span>Wieder verbinden</span>
           </button>
         </form>
         <form method="post" action="/destinations/{{ destination.id }}/delete" class="inline"
-              data-confirm="Remove “{{ destination.name }}” for good?">
+              data-confirm="„{{ destination.name }}“ endgültig entfernen?">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <button class="btn btn-danger btn-sm" type="submit">
-            {{ ui.icon("trash") }}<span>Remove</span>
+            {{ ui.icon("trash") }}<span>Entfernen</span>
           </button>
         </form>
         {% endif %}
@@ -127,51 +136,54 @@
   </div>
 
   <p class="section-note">
-    Typical wait is the median time from a match being found to its notification arriving.
-    Most of it is queue time, not the far end thinking about it. A growing wait means the
-    queue is backing up. A falling success rate means the destination is refusing.
+    Die typische Wartezeit ist der Median von der Fund eines Treffers bis zum Eintreffen
+    seiner Benachrichtigung. Der größte Teil davon ist Warteschlangenzeit, nicht die
+    Denkzeit des Empfängers. Eine steigende Wartezeit bedeutet, dass sich die Warteschlange
+    staut; eine sinkende Erfolgsquote, dass der Empfänger ablehnt.
   </p>
   <p class="section-note">
-    A destination switches itself off when the far end says the target is gone: a deleted
-    webhook, or a chat that blocked the bot. Only you know whether that is still true, so
-    reconnecting is your call rather than something it retries at you.
+    Ein Empfänger schaltet sich selbst ab, wenn das andere Ende meldet, dass es das Ziel
+    nicht mehr gibt: ein gelöschter Webhook oder ein Chat, der den Bot blockiert hat. Nur
+    du weißt, ob das noch stimmt – deshalb ist Wiederverbinden deine Entscheidung und
+    nicht etwas, das einfach weiter bei dir nachfragt.
   </p>
   {% endif %}
 </section>
 
-<section aria-label="Add a destination">
+<section aria-label="Empfänger hinzufügen">
   <div class="section-head">
-    <h2>Add a destination</h2>
+    <h2>Empfänger hinzufügen</h2>
   </div>
   <div class="card card-pad form-narrow">
     <form method="post" action="/destinations">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <div class="form-grid">
         <div class="field">
-          <label for="kind">Type</label>
+          <label for="kind">Typ</label>
           <select id="kind" name="kind">
-            <option value="discord">Discord webhook</option>
-            <option value="telegram">Telegram chat</option>
-            <option value="ntfy">ntfy topic</option>
-            <option value="webhook">Plain webhook</option>
+            <option value="discord">Discord-Webhook</option>
+            <option value="telegram">Telegram-Chat</option>
+            <option value="ntfy">ntfy-Thema</option>
+            <option value="webhook">Einfacher Webhook</option>
           </select>
         </div>
         <div class="field">
           <label for="dest_name">Name</label>
-          <input type="text" id="dest_name" name="name" placeholder="my server">
+          <input type="text" id="dest_name" name="name" placeholder="mein Server">
         </div>
         <div class="field span-all">
-          <label for="target">Webhook URL, chat id, or topic</label>
+          <label for="target">Webhook-URL, Chat-ID oder Thema</label>
           <input type="text" id="target" name="target" required>
           <p class="hint">
-            Discord: server settings, then Integrations, then Webhooks, then copy the URL.
-            Telegram: <code>vinted-sniper pair-telegram</code> prints a link that sets the
-            chat up for you. This box is the only place a stored webhook URL is ever shown.
+            Discord: Servereinstellungen, dann Integrationen, dann Webhooks, dann die URL
+            kopieren. Telegram: <code class="mono">vinted-sniper pair-telegram</code> gibt
+            einen Link aus, der den Chat für dich einrichtet. Eine gespeicherte
+            Webhook-URL wird ausschließlich hier angezeigt.
           </p>
         </div>
       </div>
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Add destination</button>
+        <button type="submit" class="btn btn-primary">Empfänger hinzufügen</button>
       </div>
     </form>
   </div>

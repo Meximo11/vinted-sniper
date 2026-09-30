@@ -138,6 +138,61 @@
     });
   }
 
+  // --- Theme --------------------------------------------------------------------
+  // Three choices, not two: "follow the system" is the one most people want and it is
+  // the one a light/dark toggle cannot express. The attribute is set on <html> and the
+  // stylesheet does the rest, so nothing here has to know what a theme looks like.
+  //
+  // The inline script in the document head has already applied the stored choice before
+  // the first paint; this only keeps the control in step and records changes.
+
+  const THEME_KEY = "vinted-sniper-theme";
+  const root = document.documentElement;
+  const options = [...document.querySelectorAll("[data-theme-choice]")];
+  const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
+
+  const readTheme = () => {
+    try {
+      const stored = localStorage.getItem(THEME_KEY);
+      return stored === "light" || stored === "dark" ? stored : "system";
+    } catch {
+      return "system";
+    }
+  };
+
+  const applyTheme = (choice) => {
+    if (choice === "light" || choice === "dark") {
+      root.setAttribute("data-theme", choice);
+    } else {
+      root.removeAttribute("data-theme");
+    }
+    for (const option of options) {
+      option.setAttribute("aria-pressed", String(option.dataset.themeChoice === choice));
+    }
+  };
+
+  // While the choice is "system", follow the machine as it switches at sunset — the
+  // switcher would otherwise sit there showing "system" while contradicting it.
+  const followSystem = () => {
+    if (readTheme() === "system") applyTheme("system");
+  };
+  if (systemDark.addEventListener) systemDark.addEventListener("change", followSystem);
+  else systemDark.addListener(followSystem);
+
+  applyTheme(readTheme());
+  for (const option of options) {
+    option.addEventListener("click", () => {
+      const choice = option.dataset.themeChoice;
+      try {
+        if (choice === "system") localStorage.removeItem(THEME_KEY);
+        else localStorage.setItem(THEME_KEY, choice);
+      } catch {
+        /* Storage unavailable: the choice still applies for this page view. */
+      }
+      applyTheme(choice);
+    });
+  }
+
   // --- Confirming the actions that cannot be undone -----------------------------
   // Marked in the markup rather than matched on a button's colour or text, so
   // renaming a button can never quietly remove the confirmation.

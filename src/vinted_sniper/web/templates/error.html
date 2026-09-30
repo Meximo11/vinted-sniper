@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark light">
+  <meta name="color-scheme" content="light dark">
   <title>{{ status_code }} · vinted-sniper</title>
   <link rel="stylesheet" href="/static/app.css">
 </head>
@@ -13,17 +13,17 @@
     <h1>{{ message }}</h1>
     <p class="hint">
       {% if status_code == 403 %}
-        Pages hand out a one-time token so another site cannot post here on your behalf.
-        Reload the dashboard and try the action again.
+        Diese Seite gibt ein einmaliges Token aus, damit keine andere Seite in deinem Namen
+        hier etwas abschicken kann. Lade das Dashboard neu und wiederhole die Aktion.
       {% elif status_code == 401 %}
-        This page needs the dashboard token before it will show anything.
+        Diese Seite zeigt erst etwas an, wenn das Dashboard-Token vorliegt.
       {% else %}
-        Nothing was changed.
+        Es wurde nichts verändert.
       {% endif %}
     </p>
-    <a class="btn btn-primary" href="/">Back to the dashboard</a>
+    <a class="btn btn-primary" href="/">Zurück zur Übersicht</a>
     {% if auth_enabled and status_code == 401 %}
-      <a class="btn btn-quiet" href="/login">Sign in</a>
+      <a class="btn btn-quiet" href="/login">Anmelden</a>
     {% endif %}
   </main>
 </body>

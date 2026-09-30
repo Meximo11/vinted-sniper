@@ -12,7 +12,7 @@ import asyncio
 import contextlib
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Final
 
 from vinted_sniper.db.repo import Repo
 
@@ -23,6 +23,16 @@ HEARTBEAT_STALE_S = 300
 # Checks without a new listing before the health view calls a search stale. The watchdog
 # uses its own configurable threshold; this is only for the one-word summary.
 STALE_SUMMARY_CYCLES = 10
+
+# The dashboard is German, so the word in the status pill is German too. The state value
+# itself stays the English machine word the rest of the codebase and the tests share.
+_STATE_LABELS: Final[dict[str, str]] = {
+    "ok": "läuft",
+    "starting": "startet",
+    "failing": "gestört",
+    "stale": "ohne Treffer",
+    "paused": "pausiert",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +62,11 @@ class SearchHealth:
         if self.checks_without_new_listings >= STALE_SUMMARY_CYCLES:
             return "stale"
         return "ok"
+
+    @property
+    def state_label(self) -> str:
+        """The same summary, said in the language the interface is written in."""
+        return _STATE_LABELS.get(self.state, self.state)
 
     def as_dict(self) -> dict[str, Any]:
         return {

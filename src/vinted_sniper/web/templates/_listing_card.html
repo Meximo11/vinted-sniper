@@ -1,15 +1,15 @@
 {% import "_icons.html" as ui %}
 
-{# One found listing. Photos lead because that is how a decision gets made, then the
-   two numbers that matter (what it says, and what it costs), then the facts that
-   decide whether it is worth a click. #}
+{# Ein gefundener Artikel. Das Foto führt, weil darüber entschieden wird, dann die Zahl,
+   die zählt (was steht drin, und was kostet es), dann die Fakten, die den Klick wert
+   machen. #}
 
 {% macro card(row) -%}
 <article class="listing">
   {% if row.photos %}
   <button type="button" class="photo" data-photos='{{ row.photos | tojson }}'
-          aria-label="View {{ row.photos | length }} photo{{ 's' if row.photos | length > 1 }} of {{ row.title }}">
-    <span class="photo-fallback" aria-hidden="true">{{ ui.icon("image") }}<span class="photo-fallback-text">Photo unavailable</span></span>
+          aria-label="{{ row.photos | length }} Bild{{ 'er' if row.photos | length > 1 }} von {{ row.title }} ansehen">
+    <span class="photo-fallback" aria-hidden="true">{{ ui.icon("image") }}<span class="photo-fallback-text">Bild nicht verfügbar</span></span>
     <img src="{{ row.photos[0] }}" alt="" loading="lazy">
     {% if row.photos | length > 1 %}
     <span class="count">{{ ui.icon("image") }}{{ row.photos | length }} ▣</span>
@@ -17,15 +17,15 @@
   </button>
   {% else %}
   <div class="no-photo">
-    <span class="photo-fallback" aria-hidden="true">{{ ui.icon("image") }}<span class="photo-fallback-text">No photo</span></span>
+    <span class="photo-fallback" aria-hidden="true">{{ ui.icon("image") }}<span class="photo-fallback-text">Kein Bild</span></span>
   </div>
   {% endif %}
   <div class="body">
     <a class="title" href="{{ row.url }}" target="_blank" rel="noreferrer"
        title="{{ row.title }}">{{ row.title }}</a>
     <div class="price">
-      <strong>{% if row.price %}{{ row.price }}{% else %}<span class="faint">Unknown</span>{% endif %}</strong>
-      {% if row.total_price %}<span class="total">{{ row.total_price }} total</span>{% endif %}
+      <strong>{% if row.price %}{{ row.price }}{% else %}<span class="faint">Unbekannt</span>{% endif %}</strong>
+      {% if row.total_price %}<span class="total">{{ row.total_price }} gesamt</span>{% endif %}
     </div>
     {% if row.brand or row.size or row.condition %}
     <div class="tags">
@@ -42,13 +42,13 @@
         {% else %}<span>@{{ row.seller_login }}</span>{% endif %}
       {% endif %}
       {% if row.seller_stars %}
-      <span>⭐ {{ row.seller_stars }}{% if row.seller_feedback_count %} ({{ row.seller_feedback_count }}){% endif %}</span>
+      <span>★ {{ row.seller_stars }}{% if row.seller_feedback_count %} ({{ row.seller_feedback_count }}){% endif %}</span>
       {% endif %}
       {% if row.favourite_count %}<span>♥ {{ row.favourite_count }}</span>{% endif %}
     </div>
     {% endif %}
     <div class="meta foot">
-      <span class="search-name">{{ row.query_name or 'Unassigned' }}</span>
+      <span class="search-name">{{ row.query_name or 'Nicht zugeordnet' }}</span>
       <span class="age nowrap">{{ row.age }}</span>
     </div>
   </div>

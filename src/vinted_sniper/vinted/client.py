@@ -93,18 +93,18 @@ def raise_for_status(response: Response, tld: str) -> None:
         return
 
     if status == HTTPStatus.UNAUTHORIZED:
-        raise AuthExpiredError(f"vinted.{tld} rejected the session token")
+        raise AuthExpiredError(f"vinted.{tld} hat das Sitzungstoken abgelehnt")
 
     if status in (HTTPStatus.FORBIDDEN, HTTPStatus.PROXY_AUTHENTICATION_REQUIRED):
-        raise BlockedError(f"vinted.{tld} refused the request with {status}")
+        raise BlockedError(f"vinted.{tld} hat die Anfrage mit {status} abgelehnt")
 
     if status == HTTPStatus.TOO_MANY_REQUESTS:
         raise RateLimitedError(_retry_after(response))
 
     if status >= HTTPStatus.INTERNAL_SERVER_ERROR:
-        raise NetworkError(f"vinted.{tld} returned {status}")
+        raise NetworkError(f"vinted.{tld} hat {status} zurückgegeben")
 
-    raise NetworkError(f"vinted.{tld} returned an unexpected {status}")
+    raise NetworkError(f"vinted.{tld} hat unerwartet {status} zurückgegeben")
 
 
 def _retry_after(response: Response) -> float | None:
@@ -124,7 +124,7 @@ def _parse_catalog(response: Response, tld: str, *, keep_raw: bool) -> list[Item
     except ValueError as exc:
         # Most often this is an anti-bot interstitial served with a 200.
         preview = response.text[:200].replace("\n", " ")
-        raise MalformedResponseError(f"vinted.{tld} did not return JSON: {preview!r}") from exc
+        raise MalformedResponseError(f"vinted.{tld} hat kein JSON geliefert: {preview!r}") from exc
 
     if not isinstance(payload, dict):
         raise MalformedResponseError(
@@ -133,8 +133,8 @@ def _parse_catalog(response: Response, tld: str, *, keep_raw: bool) -> list[Item
 
     if (message := payload.get("message")) and "items" not in payload:
         if payload.get("code") == _INVALID_TOKEN_CODE:
-            raise AuthExpiredError(f"vinted.{tld} says: {message}")
-        raise MalformedResponseError(f"vinted.{tld} says: {message}")
+            raise AuthExpiredError(f"vinted.{tld} meldet: {message}")
+        raise MalformedResponseError(f"vinted.{tld} meldet: {message}")
 
     raw_items = payload.get("items")
     if raw_items is None:

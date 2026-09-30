@@ -3,28 +3,28 @@
 {% import "_listing_card.html" as cards %}
 {% from "_pager.html" import pager %}
 
-{% block title %}Listings · vinted-sniper{% endblock %}
-{% block heading %}Listings{% endblock %}
+{% block title %}Artikel · vinted-sniper{% endblock %}
+{% block heading %}Artikel{% endblock %}
 
 {% block content %}
 {% if filter_text or filter_query %}
   <div class="flash flash-ok" role="status">
     {{ ui.icon("search") }}<span>
-      Showing {{ total }} listing{{ 's' if total != 1 }} matching this filter.
+      {{ total }} Artikel{{ '' if total == 1 else ' passen' }} zu diesem Filter.
     </span>
   </div>
 {% endif %}
 
 <form class="card card-pad filters" method="get" action="/listings" role="search">
   <div class="field">
-    <label for="q">Search listings</label>
+    <label for="q">Artikel durchsuchen</label>
     <input type="search" id="q" name="q" value="{{ filter_text }}"
-           placeholder="Title, brand or seller" autocomplete="off">
+           placeholder="Titel, Marke oder Verkäufer" autocomplete="off">
   </div>
   <div class="field">
-    <label for="search">Search name</label>
+    <label for="search">Zugehörige Suche</label>
     <select id="search" name="search">
-      <option value="">All searches</option>
+      <option value="">Alle Suchen</option>
       {% for item in queries %}
       <option value="{{ item.id }}" {% if filter_query == item.id %}selected{% endif %}>
         {{ item.name }}{% if counts.get(item.id) %} ({{ counts[item.id] }}){% endif %}
@@ -33,24 +33,24 @@
     </select>
   </div>
   <div class="field filter-actions">
-    <button class="btn btn-primary" type="submit">{{ ui.icon("search") }}<span>Filter</span></button>
+    <button class="btn btn-primary" type="submit">{{ ui.icon("search") }}<span>Filtern</span></button>
     {% if filter_text or filter_query %}
-    <a class="btn btn-quiet" href="/listings">Clear</a>
+    <a class="btn btn-quiet" href="/listings">Zurücksetzen</a>
     {% endif %}
   </div>
 </form>
 
 {% if not listings %}
   {% if filter_text or filter_query %}
-    {{ cards.empty("Nothing matches", "No listing matches that filter. Try a shorter word, or clear it to see everything again.") }}
+    {{ cards.empty("Keine Treffer", "Kein Artikel passt zu diesem Filter. Versuche ein kürzeres Wort oder setz den Filter zurück, um wieder alles zu sehen.") }}
   {% else %}
-    {{ cards.empty("Nothing found yet", "Matches show up here as soon as a search finds one. Nothing to page through until then.") }}
+    {{ cards.empty("Noch nichts gefunden", "Treffer erscheinen hier, sobald eine Suche etwas findet. Bis dahin gibt es nichts zu blättern.") }}
   {% endif %}
 {% else %}
   <div class="section-head">
-    <h2>{{ total }} listing{{ 's' if total != 1 }} found</h2>
+    <h2>{{ total }} Artikel gefunden</h2>
     <div class="spacer"></div>
-    <span class="hint">Page {{ page }} of {{ pages }}</span>
+    <span class="hint">Seite {{ page }} von {{ pages }}</span>
   </div>
 
   {{ cards.grid(listings) }}
@@ -61,12 +61,12 @@
 {% block lightbox %}
 {% if listings %}
 <div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true"
-     aria-label="Listing photos">
-  <button type="button" class="lb-close" aria-label="Close">×</button>
-  <button type="button" class="lb-prev" aria-label="Previous photo">‹</button>
-  <span class="photo-fallback" aria-hidden="true">{{ ui.icon("image") }}<span class="photo-fallback-text">This photo could not be loaded</span></span>
-  <img id="lb-img" src="" alt="Listing photo">
-  <button type="button" class="lb-next" aria-label="Next photo">›</button>
+     aria-label="Artikelbilder">
+  <button type="button" class="lb-close" aria-label="Schließen">×</button>
+  <button type="button" class="lb-prev" aria-label="Vorheriges Bild">‹</button>
+  <span class="photo-fallback" aria-hidden="true">{{ ui.icon("image") }}<span class="photo-fallback-text">Dieses Bild konnte nicht geladen werden</span></span>
+  <img id="lb-img" src="" alt="Artikelbild">
+  <button type="button" class="lb-next" aria-label="Nächstes Bild">›</button>
   <span class="lb-counter" id="lb-counter"></span>
 </div>
 {% endif %}

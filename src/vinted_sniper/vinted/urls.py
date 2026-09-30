@@ -75,12 +75,13 @@ def extract_tld(url: str) -> str:
     host = urlparse(url).netloc.lower().split(":")[0]
     host = host.removeprefix("www.")
     if not host.startswith("vinted."):
-        raise InvalidSearchURLError(f"{url!r} is not a vinted.* address")
+        raise InvalidSearchURLError(f"{url!r} ist keine vinted.*-Adresse")
 
     tld = host.removeprefix("vinted.")
     if tld not in KNOWN_TLDS:
         raise InvalidSearchURLError(
-            f"{tld!r} is not a Vinted country site. Known sites: {', '.join(sorted(KNOWN_TLDS))}"
+            f"{tld!r} ist keine Vinted-Länderseite. Bekannte Seiten: "
+            f"{', '.join(sorted(KNOWN_TLDS))}"
         )
     return tld
 
@@ -125,7 +126,7 @@ def normalise_search_url(url: str) -> str:
     """
     url = url.strip()
     if not url:
-        raise InvalidSearchURLError("no URL given")
+        raise InvalidSearchURLError("keine URL angegeben")
     if not url.startswith(("http://", "https://")):
         url = f"https://{url}"
 
@@ -133,8 +134,8 @@ def normalise_search_url(url: str) -> str:
     params = parse_search_params(url)
     if len(params) == 1:  # only the order we added ourselves
         raise InvalidSearchURLError(
-            "that URL has no search filters on it. Open Vinted, set up the search you want, "
-            "then copy the address bar once results are showing."
+            "Diese URL enthält keine Suchfilter. Öffne Vinted, richte die gewünschte "
+            "Suche ein und kopiere die Adresszeile, sobald Ergebnisse zu sehen sind."
         )
 
     # safe="+" keeps multi-word searches intact: the site encodes spaces as '+' and

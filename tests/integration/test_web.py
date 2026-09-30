@@ -120,6 +120,30 @@ def test_the_health_check_needs_no_token(client: TestClient) -> None:
     assert "alive" in response.json()
 
 
+def test_a_url_that_matches_nothing_gets_the_german_error_page(signed_in: TestClient) -> None:
+    """A mistyped URL is typed by a human, so it gets a page and not a JSON blob.
+
+    The router raises Starlette's HTTPException, which is not the subclass FastAPI raises
+    from a route — registering the handler on the subclass alone left this path answering
+    `{"detail": "Not Found"}` in English.
+    """
+    response = signed_in.get("/gibt-es-diese-seite-nicht", headers={"accept": "text/html"})
+
+    assert response.status_code == 404
+    assert "text/html" in response.headers["content-type"]
+    assert "Diese Seite gibt es nicht." in response.text
+    assert "Zurück zur Übersicht" in response.text
+    assert "Not Found" not in response.text
+
+
+def test_the_api_still_answers_with_json_for_an_unknown_route(signed_in: TestClient) -> None:
+    """The page is for browsers; the builder fetches with fetch() and wants JSON."""
+    response = signed_in.get("/gibt-es-diese-seite-nicht", headers={"accept": "application/json"})
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not Found"}
+
+
 def test_without_a_token_the_dashboard_is_open(tmp_path: Path, repo: Repo) -> None:
     """The default for a localhost dashboard: no password, no sign-in page."""
     settings = Settings(_env_file=None, db_path=tmp_path / "a.db", web_enabled=True)  # type: ignore[call-arg]
@@ -282,7 +306,7 @@ async def test_found_listings_render_as_cards_with_their_gallery(
     assert "123-back.jpeg" in body
     assert "2 ▣" in body
     assert "@seller" in body
-    assert "⭐ 4.5" in body  # feedback_reputation 0.9, on the five-star scale
+    assert "★ 4.5" in body  # feedback_reputation 0.9, on the five-star scale
     assert "Nike" in body
 
 
@@ -334,8 +358,8 @@ def _page_with_tree() -> Response:
 def test_the_dashboard_offers_the_builder_when_the_service_is_wired(
     builder_client: TestClient, signed_in: TestClient
 ) -> None:
-    assert "Build a search instead" in builder_client.get("/").text
-    assert "Build a search instead" not in signed_in.get("/").text
+    assert "Selbst zusammenstellen" in builder_client.get("/").text
+    assert "Selbst zusammenstellen" not in signed_in.get("/").text
 
 
 def test_the_filter_endpoints_need_a_login(client: TestClient) -> None:
@@ -460,7 +484,7 @@ async def test_the_searches_page_offers_an_editor_for_each_search(
     body = signed_in.get("/searches").text
 
     assert "my search" in body
-    assert "Edit" in body
+    assert "Bearbeiten" in body
     assert "data-disclosure" in body
 
 
@@ -595,7 +619,7 @@ async def test_a_disabled_destination_offers_a_reconnect_and_says_why(
 
     body = signed_in.get("/destinations").text
 
-    assert "Reconnect" in body
+    assert "Wieder verbinden" in body
     assert "bot blocked the chat" in body
     assert f"/destinations/{destination_id}/reactivate" in body
 
@@ -646,9 +670,9 @@ async def test_the_activity_page_shows_a_full_window_of_days(signed_in: TestClie
 
 
 async def test_a_flash_message_arrives_as_a_query_parameter(signed_in: TestClient) -> None:
-    body = signed_in.get("/", params={"ok": "Saved \u201cnike\u201d."}).text
+    body = signed_in.get("/", params={"ok": "\u201enike\u201c gespeichert."}).text
 
-    assert "Saved \u201cnike\u201d." in body
+    assert "\u201enike\u201c gespeichert." in body
     assert 'role="status"' in body or 'class="flash"' in body
 
 
@@ -820,8 +844,8 @@ async def test_a_refused_post_shows_a_page_rather_than_json(signed_in: TestClien
     )
 
     assert response.status_code == 403
-    assert "expired" in response.text
-    assert "Back to the dashboard" in response.text
+    assert "Dieses Formular ist abgelaufen." in response.text
+    assert "Zurück zur Übersicht" in response.text
 
 
 async def test_the_json_api_still_answers_with_json(signed_in: TestClient) -> None:
@@ -867,7 +891,7 @@ async def test_the_listing_browser_pages(
     assert first.status_code == 200
     assert first.text.count("<article") == 24
     assert second.text.count("<article") == 1
-    assert "25 listings found" in first.text
+    assert "25 Artikel gefunden" in first.text
     assert 'aria-current="page"' in first.text
 
 
@@ -880,7 +904,7 @@ async def test_a_page_past_the_end_lands_on_the_last_one(
     body = signed_in.get("/listings", params={"page": 99}).text
 
     assert "<article" in body
-    assert "Page 2 of 2" in body
+    assert "Seite 2 von 2" in body
 
 
 async def test_nonsense_page_numbers_are_clamped(
@@ -934,7 +958,7 @@ async def test_the_browser_can_be_filtered_by_search(
     shoes, trainers = await repo.list_queries()
     body = signed_in.get("/listings", params={"search": shoes.id}).text
 
-    assert "5 listings found" in body
+    assert "5 Artikel gefunden" in body
     assert "shoes" in body
     # The dropdown offers both searches; the grid must only hold the filtered one.
     assert body.count("<article") == 5
@@ -950,7 +974,7 @@ async def test_the_browser_can_be_searched_by_text(
 
     body = signed_in.get("/listings", params={"q": "Nike"}).text
 
-    assert "5 listings" in body
+    assert "5 Artikel" in body
 
 
 async def test_a_search_that_matches_nothing_says_so_rather_than_looking_broken(
@@ -960,7 +984,7 @@ async def test_a_search_that_matches_nothing_says_so_rather_than_looking_broken(
 
     body = signed_in.get("/listings", params={"q": "zzz-nothing-matches"}).text
 
-    assert "Nothing matches" in body
+    assert "Keine Treffer" in body
     assert "<article" not in body
 
 
@@ -1003,7 +1027,7 @@ async def test_the_browser_needs_a_login(client: TestClient) -> None:
 async def test_an_empty_browser_explains_itself(signed_in: TestClient) -> None:
     body = signed_in.get("/listings").text
 
-    assert "Nothing found yet" in body
+    assert "Noch nichts gefunden" in body
     assert "pager" not in body
 
 
@@ -1069,9 +1093,9 @@ async def test_a_healthy_destination_shows_its_wait_and_success_rate(
 
     body = signed_in.get("/destinations").text
 
-    assert "Typical wait" in body
-    assert "2.0s" in body
-    assert "Arrived" in body
+    assert "Typische Wartezeit" in body
+    assert "2,0 s" in body
+    assert "Angekommen" in body
     assert "delivery-ok" in body
 
 
@@ -1082,7 +1106,7 @@ async def test_a_slow_destination_is_flagged(signed_in: TestClient, repo: Repo) 
     body = signed_in.get("/destinations").text
 
     assert "delivery-slow" in body
-    assert "300.0s" in body
+    assert "300,0 s" in body
 
 
 async def test_a_destination_that_keeps_failing_is_flagged(
@@ -1126,5 +1150,5 @@ async def test_the_median_is_used_not_the_mean(signed_in: TestClient, repo: Repo
 
     body = signed_in.get("/destinations").text
 
-    assert "1.0s" in body
+    assert "1,0 s" in body
     assert "delivery-ok" in body, "one slow send should not condemn the destination"

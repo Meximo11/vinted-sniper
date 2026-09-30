@@ -81,7 +81,7 @@ def test_multi_word_searches_keep_their_plus_signs() -> None:
 
 
 def test_url_without_filters_is_refused_with_advice() -> None:
-    with pytest.raises(urls.InvalidSearchURLError, match="no search filters"):
+    with pytest.raises(urls.InvalidSearchURLError, match="keine Suchfilter"):
         urls.normalise_search_url("https://www.vinted.fr/catalog")
 
 
