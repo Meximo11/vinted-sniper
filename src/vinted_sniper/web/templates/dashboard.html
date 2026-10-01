@@ -110,7 +110,7 @@
   </div>
   {% if not recent %}
     {{ cards.empty("Noch nichts gefunden",
-        "Lege eine Suche an, und die Treffer erscheinen hier, sobald sie eingestellt werden. Die erste Abfrage läuft still – du wirst also nicht von einer Wand aus Meldungen empfangen.") }}
+        "Lege eine Suche an, und die Treffer erscheinen hier, sobald sie eingestellt werden. Die erste Abfrage läuft still. Du wirst also nicht von einer Wand aus Meldungen empfangen.") }}
   {% else %}
     {{ cards.grid(recent) }}
   {% endif %}

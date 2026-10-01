@@ -101,36 +101,36 @@ def build_dispatcher(repo: Repo) -> Dispatcher:
             # the link, so a typed command carries nothing to match against.
             waiting = await _pending_pairing_exists(repo)
             extra = (
-                "\n\nThere is a connection waiting. Tap the link vinted-sniper printed, "
-                "or send:\n/start <the code from that link>"
+                "\n\nEs wartet eine Verknüpfung. Öffne den Link, den vinted-sniper "
+                "ausgegeben hat, oder sende:\n/start <den Code aus diesem Link>"
                 if waiting
-                else "\n\nTo connect it, run `vinted-sniper pair-telegram` and tap the link "
-                "it prints, in the chat you want alerts in."
+                else "\n\nFühre `vinted-sniper pair-telegram` aus und öffne den Link, den es "
+                "ausgibt, in dem Chat, in dem du Meldungen möchtest."
             )
-            await message.answer(f"Hello. This bot delivers Vinted alerts.{extra}")
+            await message.answer(f"Hallo. Dieser Bot verschickt Vinted-Meldungen.{extra}")
             return
 
         thread_id = message.message_thread_id
         destination_id = await claim_pairing(repo, code, message.chat.id, thread_id)
         if destination_id is None:
             await message.answer(
-                "That link has expired or was already used. Generate a new one in "
-                "vinted-sniper and try again."
+                "Dieser Link ist abgelaufen oder wurde schon benutzt. Erzeuge in "
+                "vinted-sniper einen neuen und versuche es noch einmal."
             )
             return
 
         log.info("telegram.paired", destination_id=destination_id, chat_id=message.chat.id)
         await message.answer(
-            "Connected. Matching listings will arrive here.\n"
-            "Send /status any time to check that everything is still running."
+            "Verbunden. Passende Artikel kommen ab jetzt hier an.\n"
+            "Sende jederzeit /status, um zu prüfen, ob alles noch läuft."
         )
 
     @dispatcher.message(Command("help"))
     async def handle_help(message: Message) -> None:
         await message.answer(
-            "/status — is everything still running\n"
-            "/start <code> — connect this chat to vinted-sniper\n\n"
-            "Searches and destinations are managed in vinted-sniper itself."
+            "/status: Läuft noch alles?\n"
+            "/start <Code>: verbindet diesen Chat mit vinted-sniper\n\n"
+            "Suchen und Empfänger verwaltest du in vinted-sniper selbst."
         )
 
     @dispatcher.message(Command("status"))
@@ -139,30 +139,41 @@ def build_dispatcher(repo: Repo) -> Dispatcher:
 
     @dispatcher.message(F.text)
     async def handle_anything_else(message: Message) -> None:
-        await message.answer("I understand /status and /help.")
+        await message.answer("Ich verstehe /status und /help.")
 
     return dispatcher
+
+
+def _ago(then: int | None) -> str:
+    """How long ago, in the words the interface is written in.
+
+    Kept local rather than shared with the dashboard's `_age`: the two read for
+    different jobs. This one answers a single operator question about one clock,
+    and importing the web module would point the bot back at the layer that
+    serves it.
+    """
+    if then is None:
+        return "nie"
+    return f"vor {int(time.time() - then)} s"
 
 
 async def _status_text(repo: Repo) -> str:
     snapshot = await health.snapshot(repo)
     if not snapshot.searches:
-        return "No searches set up yet."
+        return "Noch keine Suche angelegt."
 
-    lines = ["<b>vinted-sniper</b>", "Running." if snapshot.alive else "⚠️ Not responding."]
+    lines = ["<b>vinted-sniper</b>", "Läuft." if snapshot.alive else "Antwortet nicht."]
     for search in snapshot.searches:
-        last = (
-            f"{int(time.time() - search.last_success_at)}s ago"
-            if search.last_success_at
-            else "never"
+        line = (
+            f"• {search.name} ({search.state_label}), "
+            f"zuletzt geprüft {_ago(search.last_success_at)}"
         )
-        line = f"• {search.name} — {search.state}, last checked {last}"
         if search.state == "failing" and search.last_error:
             line += f"\n  {search.last_error[:120]}"
         lines.append(line)
 
     if snapshot.queued_notifications:
-        lines.append(f"{snapshot.queued_notifications} notification(s) waiting to send.")
+        lines.append(f"{snapshot.queued_notifications} Meldungen warten noch auf den Versand.")
     return "\n".join(lines)
 
 

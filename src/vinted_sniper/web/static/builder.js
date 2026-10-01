@@ -278,7 +278,7 @@
       link.textContent = "Diese Suche zuerst auf Vinted prüfen ↗";
       preview.append(link);
     } else {
-      preview.textContent = "Wähle ein paar Filter – die URL oben füllt sich von selbst.";
+      preview.textContent = "Wähle ein paar Filter. Die URL oben füllt sich von selbst.";
     }
     // Suggest a name, but never fight the user over one they typed themselves.
     if (nameInput.value === nameAuto) {

@@ -33,7 +33,7 @@
       {{ ui.icon("bell") }}
       <h3>Noch kein Empfänger</h3>
       <p>Lege unten einen Empfänger an. Bis dahin werden Artikel weiterhin gefunden und
-         gespeichert – sie haben nur niemanden, zu dem sie gehen können.</p>
+         gespeichert. Sie haben nur niemanden, zu dem sie gehen können.</p>
     </div>
   {% else %}
   <div class="dest-grid">
@@ -62,7 +62,7 @@
       {% elif destination.is_awaiting_pairing %}
       <p class="hint">
         Es wartet jemand darauf, den Verknüpfungslink zu öffnen. Benachrichtigungen werden
-        so lange in die Warteschlange gestellt und laufen von selbst ab – das ist kein Fehler.
+        so lange in die Warteschlange gestellt und laufen von selbst ab. Das ist kein Fehler.
       </p>
       {% endif %}
 
@@ -144,7 +144,7 @@
   <p class="section-note">
     Ein Empfänger schaltet sich selbst ab, wenn das andere Ende meldet, dass es das Ziel
     nicht mehr gibt: ein gelöschter Webhook oder ein Chat, der den Bot blockiert hat. Nur
-    du weißt, ob das noch stimmt – deshalb ist Wiederverbinden deine Entscheidung und
+    du weißt, ob das noch stimmt. Deshalb ist Wiederverbinden deine Entscheidung und
     nicht etwas, das einfach weiter bei dir nachfragt.
   </p>
   {% endif %}
