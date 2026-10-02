@@ -21,33 +21,36 @@
 
 {% block content %}
 
+{# --- Summen, in derselben Sprache wie der Triage-Kopf auf der Übersicht ---------
+     Eine Oberfläche hat eine Art, Zahlen zu zeigen. Fünf Kacheln wären eine zweite
+     gewesen, und eine zweite Art kostet mehr, als sie an Genauigkeit gewinnt. #}
 <section aria-label="Summen">
-  <div class="stat-grid">
-    <div class="stat tone-accent">
-      <div class="label">{{ ui.icon("box") }} Gefundene Artikel</div>
-      <div class="value">{{ found_today }}</div>
-      <div class="hint">{{ found_week }} in den letzten 7 Tagen</div>
-    </div>
-    <div class="stat tone-ok">
-      <div class="label">{{ ui.icon("send") }} Benachrichtigungen</div>
-      <div class="value">{{ outbox.sent }}</div>
-      <div class="hint">{{ sent_week }} in den letzten 7 Tagen</div>
-    </div>
-    <div class="stat {% if outbox.failed %}tone-bad{% endif %}">
-      <div class="label">{{ ui.icon("alert") }} Fehlgeschlagen</div>
-      <div class="value">{{ outbox.failed }}</div>
-      <div class="hint">nach 6 Versuchen aufgegeben</div>
-    </div>
-    <div class="stat">
-      <div class="label">{{ ui.icon("clock") }} Abgelaufen</div>
-      <div class="value">{{ outbox.cancelled }}</div>
-      <div class="hint">älter als das Zustellfenster</div>
-    </div>
-    <div class="stat">
-      <div class="label">{{ ui.icon("activity") }} Wartend</div>
-      <div class="value">{{ outbox.pending + outbox.sending }}</div>
-      <div class="hint">in der Warteschlange oder unterwegs</div>
-    </div>
+  <div class="triage triage-single">
+    <section class="triage-zone" aria-labelledby="aktivitaet-summen">
+      <h2 id="aktivitaet-summen">Summen</h2>
+      <dl class="triage-readouts">
+        <div class="readout">
+          <dt>Gefunden heute</dt>
+          <dd>{{ found_today }}<small> / {{ found_week }} in 7 T.</small></dd>
+        </div>
+        <div class="readout">
+          <dt>Zugestellt</dt>
+          <dd>{{ outbox.sent }}<small> / {{ sent_week }} in 7 T.</small></dd>
+        </div>
+        <div class="readout {% if outbox.failed %}is-bad{% else %}is-quiet{% endif %}">
+          <dt>Fehlgeschlagen</dt>
+          <dd>{{ outbox.failed }}<small> nach 6 Versuchen</small></dd>
+        </div>
+        <div class="readout is-quiet">
+          <dt>Abgelaufen</dt>
+          <dd>{{ outbox.cancelled }}<small> zu alt</small></dd>
+        </div>
+        <div class="readout is-quiet">
+          <dt>Wartend</dt>
+          <dd>{{ outbox.pending + outbox.sending }}<small> in der Schlange</small></dd>
+        </div>
+      </dl>
+    </section>
   </div>
 </section>
 
@@ -55,7 +58,7 @@
   <div class="section-head">
     <h2>Letzte 14 Tage</h2>
   </div>
-  <div class="card card-pad chart-group">
+  <div class="chart-group">
     <div>
       <div class="chart-head">
         <span class="chart-label">Gefundene Artikel</span>
@@ -78,13 +81,13 @@
 <section aria-label="Zustand je Suche">
   <div class="section-head"><h2>Je Suche</h2></div>
   {% if not snapshot.searches %}
-    <div class="card empty">
+    <div class="empty">
       {{ ui.icon("search") }}
       <h3>Es wird nichts beobachtet</h3>
       <p>Sobald eine Suche läuft, stehen hier ihre Summen und ihr Zustand.</p>
     </div>
   {% else %}
-  <div class="card table-wrap">
+  <div class="table-wrap">
     <table>
       <thead>
         <tr>
@@ -96,16 +99,16 @@
         {% for search in snapshot.searches %}
         {% set detail = states.get(search.query_id) %}
         <tr>
-          <td class="col-grow">
+          <td class="col-grow" data-label="Suche">
             <div class="cell-title">{{ search.name }}</div>
             <div class="cell-note">vinted.{{ search.tld }}</div>
           </td>
-          <td><span class="pill {{ search.state }}">{{ search.state_label or search.state }}</span></td>
-          <td class="muted">{{ search.items_total }}</td>
-          <td class="muted">{{ search.blocks }}</td>
-          <td class="muted">{{ search.rate_limits }}</td>
-          <td class="muted">{{ search.checks_without_new_listings }}</td>
-          <td class="muted nowrap">
+          <td data-label="Status"><span class="pill {{ search.state }}">{{ search.state_label or search.state }}</span></td>
+          <td class="num muted" data-label="Gesehen">{{ search.items_total }}</td>
+          <td class="num muted" data-label="Blocksperren">{{ search.blocks }}</td>
+          <td class="num muted" data-label="Rate-Limits">{{ search.rate_limits }}</td>
+          <td class="num muted" data-label="Ohne Treffer">{{ search.checks_without_new_listings }}</td>
+          <td class="muted nowrap" data-label="Letzter Erfolg">
             {% if search.last_success_at %}{{ _age(search.last_success_at, now) }}{% else %}nie{% endif %}
           </td>
         </tr>
@@ -128,22 +131,22 @@
 <section aria-label="Letzte Fehler">
   <div class="section-head"><h2>Letzte Fehler</h2></div>
   {% if not recent_failures %}
-    <div class="card empty">
+    <div class="empty">
       {{ ui.icon("check") }}
       <h3>Keine Fehler erfasst</h3>
       <p>Jede Abfrage seit dem Anlegen dieser Datenbank war entweder erfolgreich oder hat
          keinen Fehler hinterlassen.</p>
     </div>
   {% else %}
-  <div class="card table-wrap">
+  <div class="table-wrap">
     <table>
       <thead><tr><th>Wann</th><th>Suche</th><th class="col-grow">Was passiert ist</th></tr></thead>
       <tbody>
         {% for failure in recent_failures %}
         <tr>
-          <td class="muted nowrap">{{ _age(failure.last_polled_at, now) }}</td>
-          <td class="cell-title">{{ failure.query_name }}</td>
-          <td class="col-grow">
+          <td class="muted nowrap" data-label="Wann">{{ _age(failure.last_polled_at, now) }}</td>
+          <td class="cell-title" data-label="Suche">{{ failure.query_name }}</td>
+          <td class="col-grow" data-label="Was passiert ist">
             <span class="pill failing plain">{{ failure.last_status }}</span>
             <span class="cell-note">{{ failure.last_error }}</span>
           </td>

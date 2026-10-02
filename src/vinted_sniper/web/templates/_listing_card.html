@@ -1,57 +1,84 @@
 {% import "_icons.html" as ui %}
 
-{# Ein gefundener Artikel. Das Foto führt, weil darüber entschieden wird, dann die Zahl,
-   die zählt (was steht drin, und was kostet es), dann die Fakten, die den Klick wert
-   machen. #}
+{# Ein gefundener Artikel. Das Foto führt, weil darüber entschieden wird: ein
+   gebrauchter Artikel wird vom Bild her beurteilt, und das ist das eine, was diese
+   Oberfläche nicht verdecken darf.
+
+   Die Reihenfolge des Restes war vorher falsch, und das war keine Geschmacksfrage.
+   Vinted-Titel sind von Verkäufern geschrieben und unzuverlässig ("Nike pro maat s"),
+   das Alter eines Fundes ist für Wiederverkäufer die entscheidende Zahl, und der
+   Gesamtpreis ist das, was tatsächlich gezahlt wird. Deshalb: Preis und Alter nach
+   vorn, der Titel auf zwei Zeilen gestutzt, der Gesamtpreis aus seiner grauen
+   Fußnote herauf. #}
 
 {% macro card(row) -%}
-<article class="listing">
+<article class="listing{% if not row.freshness %} is-cold{% endif %}"
+         style="--fresh: {{ '%.3f' % row.freshness }}">
   {% if row.photos %}
-  <button type="button" class="photo" data-photos='{{ row.photos | tojson }}'
+  <button type="button" class="listing-photo" data-photos='{{ row.photos | tojson }}'
           aria-label="{{ row.photos | length }} Bild{{ 'er' if row.photos | length > 1 }} von {{ row.title }} ansehen">
-    <span class="photo-fallback" aria-hidden="true">{{ ui.icon("image") }}<span class="photo-fallback-text">Bild nicht verfügbar</span></span>
+    <span class="photo-fallback" aria-hidden="true">{{ ui.icon("image") }}<span>Kein Bild</span></span>
     <img src="{{ row.photos[0] }}" alt="" loading="lazy">
     {% if row.photos | length > 1 %}
-    <span class="count">{{ ui.icon("image") }}{{ row.photos | length }}</span>
+    <span class="photo-count">{{ ui.icon("image") }}{{ row.photos | length }}</span>
     {% endif %}
   </button>
   {% else %}
-  <div class="no-photo">
-    <span class="photo-fallback" aria-hidden="true">{{ ui.icon("image") }}<span class="photo-fallback-text">Kein Bild</span></span>
+  <div class="listing-photo">
+    <span class="photo-fallback" aria-hidden="true">{{ ui.icon("image") }}<span>Kein Bild</span></span>
   </div>
   {% endif %}
-  <div class="body">
-    <a class="title" href="{{ row.url }}" target="_blank" rel="noreferrer"
-       title="{{ row.title }}">{{ row.title }}</a>
-    <div class="price">
-      <strong>{% if row.price %}{{ row.price }}{% else %}<span class="faint">Unbekannt</span>{% endif %}</strong>
-      {% if row.total_price %}<span class="total">{{ row.total_price }} gesamt</span>{% endif %}
+
+  <div class="listing-body">
+    <div class="listing-price">
+      {% if row.price %}
+        <span class="now">{{ row.price }}</span>
+      {% else %}
+        <span class="now faint">Preis unbekannt</span>
+      {% endif %}
+      {% if row.total_price %}
+        <span class="total">{{ row.total_price }} gesamt</span>
+      {% endif %}
     </div>
+
+    <a class="listing-title" href="{{ row.url }}" target="_blank" rel="noreferrer"
+       title="{{ row.title }}">{{ row.title }}</a>
+
     {% if row.brand or row.size or row.condition %}
-    <div class="tags">
-      {% if row.brand %}<span class="tag brand">{{ row.brand }}</span>{% endif %}
+    <div class="listing-tags">
+      {% if row.brand %}<span class="tag tag-brand">{{ row.brand }}</span>{% endif %}
       {% if row.size %}<span class="tag">{{ row.size }}</span>{% endif %}
       {% if row.condition %}<span class="tag">{{ row.condition }}</span>{% endif %}
     </div>
     {% endif %}
+
     {% if row.seller_login or row.seller_stars or row.favourite_count %}
-    <div class="meta">
-      {% if row.seller_login %}
-        {% if row.seller_url %}
-        <a href="{{ row.seller_url }}" target="_blank" rel="noreferrer">@{{ row.seller_login }}</a>
-        {% else %}<span>@{{ row.seller_login }}</span>{% endif %}
+    <div class="listing-meta">
+      {% if row.favourite_count %}
+        <span>{{ ui.icon("heart") }} {{ row.favourite_count }}</span>
       {% endif %}
       {% if row.seller_stars %}
-      <span>★ {{ row.seller_stars }}{% if row.seller_feedback_count %} ({{ row.seller_feedback_count }}){% endif %}</span>
+        <span>★ {{ row.seller_stars }}{% if row.seller_feedback_count %} ({{ row.seller_feedback_count }}){% endif %}</span>
       {% endif %}
-      {% if row.favourite_count %}<span>♥ {{ row.favourite_count }}</span>{% endif %}
+      {% if row.seller_login %}
+        {%- if row.seller_url -%}
+        <a href="{{ row.seller_url }}" target="_blank" rel="noreferrer">@{{ row.seller_login }}</a>
+        {%- else -%}<span>@{{ row.seller_login }}</span>{%- endif -%}
+      {% endif %}
     </div>
     {% endif %}
-    <div class="meta foot">
-      <span class="search-name">{{ row.query_name or 'Nicht zugeordnet' }}</span>
-      <span class="age nowrap">{{ row.age }}</span>
+
+    <div class="listing-foot">
+      <span class="source">{{ row.query_name or 'Nicht zugeordnet' }}</span>
+      <span class="age">{{ row.age }}</span>
     </div>
   </div>
+
+  {# Die Verfallslinie. Ihre Breite ist der Anteil des Fensters, der übrig ist; bei
+     null ist der Fund vorbei und die Kachel sagt das, statt so zu tun, als wäre er
+     noch einer. Kein generisches Dashboard kann das: nur hier steht ein auf die
+     Sekunde genaues "wann haben wir ihn gefunden". #}
+  <div class="decay" aria-hidden="true"></div>
 </article>
 {%- endmacro %}
 
@@ -64,7 +91,7 @@
 
 
 {% macro empty(title, body) -%}
-<div class="card empty">
+<div class="empty">
   {{ ui.icon("box") }}
   <h3>{{ title }}</h3>
   <p>{{ body }}</p>

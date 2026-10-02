@@ -16,14 +16,14 @@
   </div>
 
   {% if not snapshot.searches %}
-    <div class="card empty">
+    <div class="empty">
       {{ ui.icon("search") }}
       <h3>Noch keine Suchen</h3>
       <p>Stelle die gewünschte Suche auf Vinted zusammen und kopiere dann die Adressezeile
          in das Feld unten. Oder nutze den Aufbauassistenten und lass die URL ganz weg.</p>
     </div>
   {% else %}
-  <div class="card table-wrap">
+  <div class="table-wrap">
     <table>
       <thead>
         <tr>
@@ -39,7 +39,7 @@
         {% for search in snapshot.searches %}
         {% set routes = routes_by_query.get(search.query_id, []) %}
         <tr>
-          <td class="col-grow">
+          <td class="col-grow" data-label="Suche">
             <div class="cell-title">{{ search.name }}</div>
             <div class="cell-note">
               vinted.{{ search.tld }}{% if routes %}, {{ routes | length }} Empfänger{% endif %}
@@ -48,15 +48,15 @@
             <div class="cell-note text-bad">{{ search.last_error[:90] }}{% if search.last_error | length > 90 %}…{% endif %}</div>
             {% endif %}
           </td>
-          <td><span class="pill {{ search.state }}">{{ search.state_label or search.state }}</span></td>
-          <td class="muted nowrap">
+          <td data-label="Status"><span class="pill {{ search.state }}">{{ search.state_label or search.state }}</span></td>
+          <td class="muted nowrap" data-label="Letzte Abfrage">
             {% if search.last_success_at %}{{ _age(search.last_success_at, now) }}{% else %}nie{% endif %}
           </td>
-          <td class="muted nowrap">
+          <td class="muted nowrap" data-label="Neuester Treffer">
             {% if search.newest_listing_at %}{{ _age(search.newest_listing_at, now) }}{% else %}noch keiner{% endif %}
           </td>
-          <td class="muted">{{ search.items_total }}</td>
-          <td>
+          <td class="num muted" data-label="Gefunden">{{ search.items_total }}</td>
+          <td data-label="">
             <div class="row-actions">
               <button type="button" class="btn btn-quiet btn-sm"
                       data-disclosure="edit-{{ search.query_id }}"
@@ -84,7 +84,7 @@
         <tr id="edit-{{ search.query_id }}" class="disclosure-row" hidden>
           <td colspan="6">
             <div data-disclosure-panel>
-              <form method="post" action="/searches/{{ search.query_id }}/edit" class="card-pad">
+              <form method="post" action="/searches/{{ search.query_id }}/edit">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <div class="form-grid">
                   <div class="field">
@@ -161,7 +161,7 @@
   <div class="section-head">
     <h2>Neue Suche</h2>
   </div>
-  <div class="card card-pad form-narrow">
+  <div class="form-narrow">
     {% include "_search_form.html" %}
   </div>
 </section>

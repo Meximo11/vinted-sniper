@@ -65,6 +65,13 @@ CSRF_MIN_LEN = 32
 # keeps a page's HTML small enough that the gallery thumbnails do not make it sluggish.
 LISTINGS_PER_PAGE = 24
 
+# How long a find stays worth acting on. Fifteen minutes is the window a Vinted drop
+# realistically lives: past that the item has been seen by everyone watching the same
+# search, and the tool's whole value was catching it early. The listing tile's decay rule
+# spends this window — accent at the moment of the catch, neutral at the end of it. It is
+# a value, not a law: change it here and every listing surface follows.
+DECAY_WINDOW_S = 15 * 60
+
 # What each destination kind is addressed by, and how much of it to show. A webhook URL
 # is a credential: anyone holding it can post to your channel, so the dashboard shows
 # enough to tell two of them apart and no more.
@@ -290,15 +297,24 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
     async def _shell(request: Request, **context: Any) -> dict[str, Any]:
         """The chrome every page shares, gathered in one place.
 
-        The sidebar shows the queue depth and the search counts, and the body shows
+        The rail shows the queue depth and the search counts, and the body shows
         them again. Reading those from separate queries is how a page ends up
         contradicting itself, so they are fetched once and passed down.
+
+        The running-state figures live here too, for the same reason: there is
+        exactly one place in the interface that says whether the thing is alive,
+        and it says the same thing on every page.
         """
+        snap = context.get("snapshot")
         return {
             "auth_enabled": token is not None,
             "csrf_token": getattr(request.state, "csrf_token", ""),
             "search_counts": await repo.search_counts(),
             "active_destinations": sum(1 for d in await repo.list_destinations() if d.active),
+            "unhealthy": (
+                sum(1 for s in snap.searches if s.state in ("failing", "stale")) if snap else 0
+            ),
+            "last_success_at": await repo.last_success_at(),
             **context,
         }
 
@@ -327,15 +343,12 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
                 recent=recent,
                 recent_failures=await repo.recent_failures(),
                 destinations_off=[d for d in destinations if not d.active],
-                unhealthy=sum(1 for s in snapshot.searches if s.state in ("failing", "stale")),
                 **_form_context(settings, snapshot, taxonomy),
             )
             | {
                 "found_today": await repo.items_since(now - 86_400),
                 "found_week": await repo.items_since(now - 7 * 86_400),
                 "outbox": await repo.outbox_status_counts(),
-                "search_counts": await repo.search_counts(),
-                "last_success_at": await repo.last_success_at(),
             },
         )
 
@@ -849,9 +862,36 @@ def _listing_views(rows: list[Any], now: int) -> list[dict[str, Any]]:
                 "favourite_count": row["favourite_count"] or 0,
                 "query_name": row["query_name"],
                 "age": _age(row["first_seen_at"], now),
+                # The decay rule draws itself from these two. `age` above is a phrase a
+                # person reads; the tile needs a proportion it can turn into a width, and
+                # a number it can style on. Re-deriving either in the template would mean
+                # every listing surface re-implementing the same arithmetic.
+                "caught_seconds": _caught_seconds(row["first_seen_at"], now),
+                "freshness": _freshness(row["first_seen_at"], now),
             }
         )
     return views
+
+
+def _caught_seconds(then: int | None, now: int) -> int:
+    """Seconds since we first saw this item, or a very large number if we never did."""
+    if then is None:
+        return DECAY_WINDOW_S
+    return max(now - then, 0)
+
+
+def _freshness(then: int | None, now: int) -> float:
+    """How much of its window a find has left, 1.0 at the moment of the catch.
+
+    Linear, because a linear promise is the only one a user can learn. A find that has
+    been open for half its window is exactly half as alive, and after the window it is
+    simply cold — the tile stops pretending and greys out. A curved falloff would look
+    livelier and mean less.
+    """
+    if then is None:
+        return 0.0
+    remaining = 1.0 - (max(now - then, 0) / DECAY_WINDOW_S)
+    return max(0.0, min(1.0, remaining))
 
 
 def _age(then: int | None, now: int) -> str:

@@ -305,8 +305,10 @@ async def test_found_listings_render_as_cards_with_their_gallery(
     assert "https://images.vinted.net/123.jpeg" in body
     assert "123-back.jpeg" in body
     # The photo-count badge: the icon, then how many. It used to carry a "▣" glyph as
-    # well, which was a font substitution pretending to be an icon.
-    assert '<span class="count">' in body
+    # well, which was a font substitution pretending to be an icon. The class is
+    # photo-count, not count: `count` also lives on the nav badge, so asserting the
+    # short name here passed for a year on a number that had nothing to do with photos.
+    assert '<span class="photo-count">' in body
     assert ">2</span>" in body
     assert "@seller" in body
     assert "★ 4.5" in body  # feedback_reputation 0.9, on the five-star scale
@@ -358,11 +360,16 @@ def _page_with_tree() -> Response:
     return Response(status_code=200, text=html, headers={}, cookies={"access_token_web": "t"})
 
 
-def test_the_dashboard_offers_the_builder_when_the_service_is_wired(
+def test_the_search_page_offers_the_builder_when_the_service_is_wired(
     builder_client: TestClient, signed_in: TestClient
 ) -> None:
-    assert "Selbst zusammenstellen" in builder_client.get("/").text
-    assert "Selbst zusammenstellen" not in signed_in.get("/").text
+    # The builder lives on /searches. It used to also be pasted into the bottom of
+    # the dashboard, where the primary verb of the whole tool sat below the fold and
+    # a scroll-jump away. The question this test asks is unchanged: does the
+    # assembler appear when the taxonomy service answers, and stay away when it
+    # does not.
+    assert "Selbst zusammenstellen" in builder_client.get("/searches").text
+    assert "Selbst zusammenstellen" not in signed_in.get("/searches").text
 
 
 def test_the_filter_endpoints_need_a_login(client: TestClient) -> None:

@@ -20,7 +20,7 @@
     (event) => {
       const image = event.target;
       if (!(image instanceof HTMLImageElement)) return;
-      image.closest(".photo, .lightbox")?.classList.add("is-broken");
+      image.closest(".listing-photo, .lightbox")?.classList.add("is-broken");
     },
     true,
   );
@@ -91,7 +91,7 @@
       box.addEventListener("animationend", done, { once: true });
     }
 
-    for (const button of document.querySelectorAll(".listing .photo")) {
+    for (const button of document.querySelectorAll(".listing .listing-photo")) {
       button.addEventListener("click", () => {
         let list = [];
         try {
@@ -121,17 +121,17 @@
   // A drawer the user opened on purpose: 180ms out-ease, and it slides from the edge
   // it lives on, so where it came from is obvious.
 
-  const menu = document.querySelector(".menu-toggle");
-  const sidebar = document.querySelector(".sidebar");
-  const scrim = document.querySelector(".nav-scrim");
-  if (menu && sidebar) {
+  const menu = document.getElementById("menu-toggle");
+  const app = document.getElementById("app");
+  const scrim = document.getElementById("nav-scrim");
+  if (menu && app) {
     const setOpen = (open) => {
-      sidebar.classList.toggle("open", open);
+      app.classList.toggle("drawer-open", open);
       menu.setAttribute("aria-expanded", String(open));
       if (scrim) scrim.hidden = !open;
       document.body.style.overflow = open ? "hidden" : "";
     };
-    menu.addEventListener("click", () => setOpen(!sidebar.classList.contains("open")));
+    menu.addEventListener("click", () => setOpen(!app.classList.contains("drawer-open")));
     if (scrim) scrim.addEventListener("click", () => setOpen(false));
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") setOpen(false);
@@ -234,4 +234,81 @@
       toggle.setAttribute("aria-expanded", String(open));
     });
   }
+
+  // --- Keyboard ----------------------------------------------------------------
+  // This is read dozens of times a day, so reaching the filter and walking the tiles
+  // without leaving the home row is the cheapest thing this interface can offer.
+  // Every shortcut is a plain keystroke: nothing here animates, because the
+  // animate skill's frequency gate says an action taken a hundred times a day does
+  // not get an entrance.
+  const tiles = [...document.querySelectorAll(".listing")];
+  const filter = document.getElementById("q");
+  const sheet = document.getElementById("shortcut-sheet");
+  let cursor = -1;
+
+  const isTyping = (target) =>
+    target instanceof HTMLElement &&
+    (target.isContentEditable ||
+      ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+
+  function select(index) {
+    if (!tiles.length) return;
+    cursor = (index + tiles.length) % tiles.length;
+    tiles.forEach((tile, i) => tile.classList.toggle("is-cursor", i === cursor));
+    const tile = tiles[cursor];
+    tile.scrollIntoView({ block: "nearest", behavior: reduced ? "auto" : "smooth" });
+  }
+
+  function closeSheet() {
+    if (!sheet) return;
+    sheet.hidden = true;
+  }
+
+  document.addEventListener("keydown", (event) => {
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+    if (event.key === "Escape") {
+      closeSheet();
+      return;
+    }
+
+    // "/" is the one people reach for out of habit. It only means something when
+    // there is a filter box to put the cursor in.
+    if (event.key === "/" && !isTyping(event.target) && filter) {
+      event.preventDefault();
+      filter.focus();
+      filter.select();
+      return;
+    }
+
+    if (event.key === "?" && !isTyping(event.target) && sheet) {
+      event.preventDefault();
+      sheet.hidden = !sheet.hidden;
+      return;
+    }
+
+    if (isTyping(event.target)) return;
+
+    if (event.key === "j" || event.key === "ArrowDown") {
+      if (tiles.length) {
+        event.preventDefault();
+        select(cursor + 1);
+      }
+      return;
+    }
+    if (event.key === "k" || event.key === "ArrowUp") {
+      if (tiles.length) {
+        event.preventDefault();
+        select(cursor - 1);
+      }
+      return;
+    }
+    if (event.key === "Enter" && cursor >= 0) {
+      const link = tiles[cursor]?.querySelector(".listing-title");
+      if (link) {
+        event.preventDefault();
+        link.click();
+      }
+    }
+  });
 })();

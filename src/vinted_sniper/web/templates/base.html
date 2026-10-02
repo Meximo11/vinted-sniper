@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <title>{% block title %}vinted-sniper{% endblock %}</title>
-  {# Runs before the stylesheet so the page never paints in the wrong theme and snaps to
-     the right one a frame later. It is inline on purpose: an external script is a request,
-     and a request is a chance to flash. #}
+  {# Läuft vor dem Stylesheet, damit die Seite nie im falschen Thema erscheint und einen
+     Bildschirm später in das richtige springt. Bewusst inline: ein externes Skript ist
+     eine Anfrage, und eine Anfrage ist eine Gelegenheit für einen Aufblitzer. #}
   <script>
     (function () {
       try {
@@ -16,7 +16,7 @@
           document.documentElement.setAttribute("data-theme", stored);
         }
       } catch (error) {
-        /* Private mode, or storage disabled. The system preference still applies. */
+        /* Privater Modus, oder Speicher gesperrt. Die Systemvorgabe gilt trotzdem. */
       }
     })();
   </script>
@@ -26,10 +26,10 @@
 <body>
   <a class="skip-link" href="#main">Zum Inhalt springen</a>
 
-  <div class="app">
-    <div class="nav-scrim" hidden></div>
+  <div class="app" id="app">
+    <div class="nav-scrim" id="nav-scrim" hidden></div>
 
-    <aside class="sidebar">
+    <aside class="rail" id="rail">
       <a class="brand" href="/">
         <span class="mark">{{ ui.icon("target") }}</span>
         <span>vinted-sniper</span>
@@ -44,7 +44,7 @@
           {% if search_counts %}<span class="count">{{ search_counts.active }}</span>{% endif %}
         </a>
         <a class="nav-link" href="/destinations" {% if nav == "destinations" %}aria-current="page"{% endif %}>
-          {{ ui.icon("bell") }}<span>Benachrichtigungen</span>
+          {{ ui.icon("bell") }}<span>Empfänger</span>
           {% if active_destinations is defined %}
             <span class="count">{{ active_destinations }}</span>
           {% endif %}
@@ -57,7 +57,27 @@
         </a>
       </nav>
 
-      <div class="sidebar-foot">
+      <div class="rail-foot">
+        {# --- Ein einziger Ort, an dem der Laufzustand sichtbar ist -------------------
+             Vorher stand derselbe Zustand zweimal auf derselben Seite: hier in der
+             Seitenleiste und noch einmal als Statusleiste oben. Zwei Antworten auf
+             dieselbe Frage, an zwei Stellen, die der Auge gegeneinander abgleichen
+             musste. Jetzt gibt es nur eine. #}
+        {% if snapshot %}
+        <div class="pulse {% if not snapshot.alive %}bad{% elif unhealthy %}warn{% endif %}"
+             role="status">
+          <span class="dot" aria-hidden="true"></span>
+          <span>
+            {%- if not snapshot.alive -%}Antwortet nicht
+            {%- elif unhealthy -%}{{ unhealthy }} brauchen Aufmerksamkeit
+            {%- else -%}Läuft{%- endif -%}
+          </span>
+          {% if last_success_at %}
+          <span class="since">{{ _age(last_success_at, now) }}</span>
+          {% endif %}
+        </div>
+        {% endif %}
+
         <div class="theme-switch" role="group" aria-label="Erscheinungsbild">
           <button type="button" class="theme-option" data-theme-choice="light"
                   aria-pressed="false" title="Hell">
@@ -73,24 +93,10 @@
           </button>
         </div>
 
-        {% if snapshot %}
-        <div class="sidebar-status {% if not snapshot.alive %}is-bad{% endif %}">
-          <div class="label">
-            {% if snapshot.alive %}{{ ui.icon("check") }} Läuft{% else %}{{ ui.icon("alert") }} Antwortet nicht{% endif %}
-          </div>
-          <div class="sidebar-status-detail">
-            {% if snapshot.queued_notifications %}
-              {{ snapshot.queued_notifications }} Benachrichtigung{{ 'en' if snapshot.queued_notifications != 1 }} wart{{ 'et' if snapshot.queued_notifications == 1 else 'en' }}
-            {% else %}
-              Nichts wartet auf Versand
-            {% endif %}
-          </div>
-        </div>
-        {% endif %}
         {% if auth_enabled %}
         <form method="post" action="/logout" class="inline">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-          <button class="btn btn-quiet btn-sm" type="submit">
+          <button class="btn btn-quiet btn-sm" type="submit" style="width: 100%">
             {{ ui.icon("logout") }}<span>Abmelden</span>
           </button>
         </form>
@@ -99,8 +105,9 @@
     </aside>
 
     <div class="main">
-      <header class="topbar">
-        <button class="menu-toggle" type="button" aria-expanded="false" aria-label="Navigation öffnen">
+      <header class="header">
+        <button class="menu-toggle" type="button" id="menu-toggle"
+                aria-expanded="false" aria-controls="rail" aria-label="Navigation öffnen">
           {{ ui.icon("menu") }}
         </button>
         <h1>{% block heading %}{{ self.title() }}{% endblock %}</h1>
@@ -124,6 +131,21 @@
         {% endblock %}
 
         {% block content %}{% endblock %}
+
+        {# Die Taste, die die Oberfläche selbst erklärt. Auf ? #}
+        <section class="shortcut-sheet" id="shortcut-sheet" hidden aria-label="Tastenkürzel">
+          <div class="section-head">
+            <h2>Tastenkürzel</h2>
+          </div>
+          <div class="shortcuts">
+            <div><span>Filter</span> <kbd>/</kbd></div>
+            <div><span>Runter</span> <kbd>j</kbd></div>
+            <div><span>Hoch</span> <kbd>k</kbd></div>
+            <div><span>Öffnen</span> <kbd>Enter</kbd></div>
+            <div><span>Diese Liste</span> <kbd>?</kbd></div>
+            <div><span>Schließen</span> <kbd>Esc</kbd></div>
+          </div>
+        </section>
       </main>
     </div>
   </div>

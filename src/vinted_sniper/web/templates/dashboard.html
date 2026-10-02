@@ -11,70 +11,93 @@
 
 {% block content %}
 
-{# --- Läuft es? Eine Aussage über das Ganze, also eine Zeile und nicht eine fünfte
-     Zahl, die mit vier anderen um Aufmerksamkeit konkurriert. Färbt sich nur, wenn
-     etwas nicht stimmt. #}
-<div class="statusbar {% if not snapshot.alive %}bad{% elif unhealthy %}warn{% endif %}"
-     role="status">
-  <span class="dot"></span>
-  {% if not snapshot.alive %}
-    <span>Die App antwortet nicht mehr auf ihre eigene Zustandsprüfung.</span>
-  {% elif unhealthy %}
-    <span>{{ unhealthy }} Such{{ 'e' if unhealthy == 1 else 'en' }} brauchen Aufmerksamkeit.</span>
-    <a href="#aufmerksamkeit">Ansehen</a>
-  {% else %}
-    <span>Alle Suchen laufen normal.</span>
-  {% endif %}
-  <span class="spacer"></span>
-  <span class="nowrap">
-    {% if last_success_at %}Letzte Abfrage {{ _age(last_success_at, now) }}{% else %}Noch keine erfolgreiche Abfrage{% endif %}
-  </span>
+{# --- Die Triage -----------------------------------------------------------------
+     Die Nachrichten dieses Werkzeugs haben zwei Arten: ein frischer Treffer ist ein
+     Gewinn, ein toter Empfänger ist ein Verlust. Das alte Dashboard hat beides in
+     eine Statusleiste und vier neutrale Kacheln gepresst — ein schlechter Tag und
+     ein guter sahen gleich aus.
+
+     Darum oben zwei Zonen, durch eine Haarlinie getrennt. Sie können sich widersprechen,
+     und wenn sie es tun, ist das Problem sichtbar, ohne dass irgendetwas gelesen
+     werden muss. Das sind Ablesestände in einem Instrumentenblock, keine Karten: eine
+     Karte pro Zahl wäre genau die Kachelvorlage, die der Gestaltungsboden verbietet,
+     sechsmal angewandt. #}
+
+{% set backlog = outbox.pending + outbox.sending %}
+<div class="triage">
+  <section class="triage-zone" aria-labelledby="triage-gewinn">
+    <h2 id="triage-gewinn">Gewinn</h2>
+    <dl class="triage-readouts">
+      <div class="readout">
+        <dt>Heute</dt>
+        <dd>{{ found_today }}</dd>
+      </div>
+      <div class="readout">
+        <dt>7 Tage</dt>
+        <dd>{{ found_week }}</dd>
+      </div>
+      <div class="readout is-quiet">
+        <dt>Zugestellt</dt>
+        <dd>{{ outbox.sent }}</dd>
+      </div>
+    </dl>
+  </section>
+
+  <div class="triage-rule" role="presentation"></div>
+
+  <section class="triage-zone" aria-labelledby="triage-todo">
+    <h2 id="triage-todo">Zu tun</h2>
+    {% if unhealthy or outbox.failed or destinations_off or backlog %}
+    <dl class="triage-readouts">
+      {% if unhealthy %}
+      <div class="readout is-bad">
+        <dt>Suchen</dt>
+        <dd>{{ unhealthy }}<small> kaputt</small></dd>
+      </div>
+      {% endif %}
+      {% if outbox.failed %}
+      <div class="readout is-bad">
+        <dt>Zustellung</dt>
+        <dd>{{ outbox.failed }}<small> fehlgeschlagen</small></dd>
+      </div>
+      {% endif %}
+      {% if destinations_off %}
+      <div class="readout is-warn">
+        <dt>Empfänger</dt>
+        <dd>{{ destinations_off | length }}<small> inaktiv</small></dd>
+      </div>
+      {% endif %}
+      {% if backlog %}
+      <div class="readout is-warn">
+        <dt>Warteschlange</dt>
+        <dd>{{ backlog }}</dd>
+      </div>
+      {% endif %}
+    </dl>
+    {% else %}
+    {# Eine ruhige Zone sagt es in Worten. Eine Reihe von Nullen liest sich wie eine
+       Messung, und ist hier keine. #}
+    <p class="triage-allclear">
+      {{ ui.icon("check") }}<span>Nichts. Alles läuft.</span>
+    </p>
+    {% endif %}
+  </section>
 </div>
 
-{# --- Die Zahlen, in der Reihenfolge, in der man sie erfragen würde ------------------- #}
-<section aria-label="Überblick">
-  <div class="stat-grid">
-    <div class="stat">
-      <div class="label">{{ ui.icon("search") }} Aktive Suchen</div>
-      <div class="value">{{ search_counts.active }}</div>
-      <div class="hint">
-        {% if search_counts.paused %}{{ search_counts.paused }} pausiert{% else %}keine pausiert{% endif %},
-        {{ search_counts.total }} gesamt
-      </div>
-    </div>
-
-    <div class="stat tone-accent">
-      <div class="label">{{ ui.icon("box") }} Heute gefunden</div>
-      <div class="value">{{ found_today }}</div>
-      <div class="hint">{{ found_week }} in den letzten 7 Tagen</div>
-    </div>
-
-    <div class="stat tone-ok">
-      <div class="label">{{ ui.icon("send") }} Zugestellt</div>
-      <div class="value">{{ outbox.sent }}</div>
-      <div class="hint">{{ outbox.pending + outbox.sending }} warten auf Versand</div>
-    </div>
-
-    <div class="stat {% if outbox.failed %}tone-bad{% endif %}">
-      <div class="label">{{ ui.icon("alert") }} Fehlgeschlagen</div>
-      <div class="value">{{ outbox.failed }}</div>
-      <div class="hint">{% if outbox.cancelled %}{{ outbox.cancelled }} aufgegeben{% else %}nichts aufgegeben{% endif %}</div>
-    </div>
-  </div>
-</section>
-
-{# --- Was man sich ansehen muss ------------------------------------------------------ #}
+{# --- Was man sich ansehen muss ----------------------------------------------------- #}
 {% if recent_failures or destinations_off %}
-<section id="aufmerksamkeit" aria-label="Braucht Aufmerksamkeit">
+<section class="section" aria-label="Braucht Aufmerksamkeit">
   <div class="section-head">
     <h2>Braucht Aufmerksamkeit</h2>
+    <div class="spacer"></div>
+    <a class="btn btn-quiet btn-sm" href="/searches">Suchen prüfen</a>
   </div>
-  <div class="card">
+  <div class="table-wrap">
     <div class="attention">
       {% for failure in recent_failures %}
       <div class="attention-row">
         {{ ui.icon("alert") }}
-        <div>
+        <div class="body">
           <div class="cell-title">{{ failure.query_name }}</div>
           <div class="cell-note">
             {{ failure.last_status }}{% if failure.last_error %}: {{ failure.last_error }}{% endif %}
@@ -87,13 +110,11 @@
       {% for destination in destinations_off %}
       <div class="attention-row">
         {{ ui.icon("bell") }}
-        <div>
+        <div class="body">
           <div class="cell-title">{{ destination.name }} empfängt keine Benachrichtigungen</div>
-          <div class="cell-note">
-            {{ destination.deactivated_reason or 'Abgeschaltet.' }}
-          </div>
+          <div class="cell-note">{{ destination.deactivated_reason or 'Abgeschaltet.' }}</div>
         </div>
-        <a class="btn btn-sm spacer" href="/destinations">Prüfen</a>
+        <a class="btn btn-sm" href="/destinations">Prüfen</a>
       </div>
       {% endfor %}
     </div>
@@ -101,8 +122,9 @@
 </section>
 {% endif %}
 
-{# --- Zuletzt gefunden --------------------------------------------------------------- #}
-<section aria-label="Zuletzt gefunden">
+{# --- Zuletzt gefunden. Das Foto führt, der Preis steht daneben, und die Verfallslinie
+     unten zeigt, wie lange der Fund noch lebt. ------------------------------------- #}
+<section class="section" aria-label="Zuletzt gefunden">
   <div class="section-head">
     <h2>Zuletzt gefunden</h2>
     <div class="spacer"></div>
@@ -116,43 +138,41 @@
   {% endif %}
 </section>
 
-{# --- Was gerade beobachtet wird, auf einen Blick ----------------------------------- #}
+{# --- Beobachtete Suchen ------------------------------------------------------------ #}
 {% if snapshot.searches %}
-<section aria-label="Beobachtete Suchen">
+<section class="section" aria-label="Beobachtete Suchen">
   <div class="section-head">
     <h2>Beobachtete Suchen</h2>
     <div class="spacer"></div>
     <a class="btn btn-quiet btn-sm" href="/searches">Verwalten</a>
   </div>
-  <div class="card table-wrap">
+  <div class="table-wrap">
     <table>
       <thead>
         <tr>
           <th class="col-grow">Suche</th>
           <th>Status</th>
           <th>Letzte Abfrage</th>
-          <th>Gefunden</th>
+          <th class="num">Gefunden</th>
           <th><span class="visually-hidden">Aktionen</span></th>
         </tr>
       </thead>
       <tbody>
         {% for search in snapshot.searches %}
         <tr>
-          <td class="col-grow">
+          <td class="col-grow" data-label="Suche">
             <div class="cell-title">{{ search.name }}</div>
-            <div class="cell-note">
-              vinted.{{ search.tld }}
-            </div>
+            <div class="cell-note">vinted.{{ search.tld }}</div>
             {% if search.last_error %}
             <div class="cell-note text-bad">{{ search.last_error[:90] }}{% if search.last_error | length > 90 %}…{% endif %}</div>
             {% endif %}
           </td>
-          <td><span class="pill {{ search.state }}">{{ search.state_label or search.state }}</span></td>
-          <td class="muted nowrap">
+          <td data-label="Status"><span class="pill {{ search.state }}">{{ search.state_label or search.state }}</span></td>
+          <td class="muted nowrap" data-label="Letzte Abfrage">
             {% if search.last_success_at %}{{ _age(search.last_success_at, now) }}{% else %}nie{% endif %}
           </td>
-          <td class="muted">{{ search.items_total }}</td>
-          <td>
+          <td class="num muted" data-label="Gefunden">{{ search.items_total }}</td>
+          <td data-label="">
             <div class="row-actions">
               <form method="post" action="/searches/{{ search.query_id }}/pause" class="inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -172,26 +192,16 @@
 </section>
 {% endif %}
 
-{# --- Eine anlegen ------------------------------------------------------------------- #}
-<section aria-label="Neue Suche">
-  <div class="section-head">
-    <h2>Neue Suche</h2>
-  </div>
-  <div class="card card-pad">
-    {% include "_search_form.html" %}
-  </div>
-</section>
-
 {% endblock %}
 
 {% block lightbox %}
 {% if recent %}
 <div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true"
      aria-label="Artikelbilder">
-  <button type="button" class="lb-close" aria-label="Schließen">×</button>
-  <button type="button" class="lb-prev" aria-label="Vorheriges Bild">‹</button>
+  <button type="button" class="lb-btn lb-close" aria-label="Schließen">×</button>
+  <button type="button" class="lb-btn lb-prev" aria-label="Vorheriges Bild">‹</button>
   <img id="lb-img" alt="Artikelbild">
-  <button type="button" class="lb-next" aria-label="Nächstes Bild">›</button>
+  <button type="button" class="lb-btn lb-next" aria-label="Nächstes Bild">›</button>
   <span class="lb-counter" id="lb-counter"></span>
 </div>
 {% endif %}

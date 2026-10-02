@@ -7,15 +7,8 @@
 {% block heading %}Artikel{% endblock %}
 
 {% block content %}
-{% if filter_text or filter_query %}
-  <div class="flash flash-ok" role="status">
-    {{ ui.icon("search") }}<span>
-      {{ '{:,}'.format(total) | replace(',', '.') }} Artikel{{ '' if total == 1 else ' passen' }} zu diesem Filter.
-    </span>
-  </div>
-{% endif %}
 
-<form class="card card-pad filters" method="get" action="/listings" role="search">
+<form class="filters" method="get" action="/listings" role="search">
   <div class="field">
     <label for="q">Artikel durchsuchen</label>
     <input type="search" id="q" name="q" value="{{ filter_text }}"
@@ -47,14 +40,16 @@
     {{ cards.empty("Noch nichts gefunden", "Treffer erscheinen hier, sobald eine Suche etwas findet. Bis dahin gibt es nichts zu blättern.") }}
   {% endif %}
 {% else %}
-  <div class="section-head">
-    <h2>{{ '{:,}'.format(total) | replace(',', '.') }} Artikel gefunden</h2>
-    <div class="spacer"></div>
-    <span class="hint">Seite {{ page }} von {{ pages }}</span>
-  </div>
+  <section class="section" aria-label="Gefundene Artikel">
+    <div class="section-head">
+      <h2>{{ '{:,}'.format(total) | replace(',', '.') }} Artikel gefunden</h2>
+      <div class="spacer"></div>
+      <span class="hint">Seite {{ page }} von {{ pages }}</span>
+    </div>
 
-  {{ cards.grid(listings) }}
-  {{ pager(page, pages, "/listings", {"q": filter_text, "search": filter_query or ""}) }}
+    {{ cards.grid(listings) }}
+    {{ pager(page, pages, "/listings", {"q": filter_text, "search": filter_query or ""}) }}
+  </section>
 {% endif %}
 {% endblock %}
 
@@ -62,11 +57,10 @@
 {% if listings %}
 <div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true"
      aria-label="Artikelbilder">
-  <button type="button" class="lb-close" aria-label="Schließen">×</button>
-  <button type="button" class="lb-prev" aria-label="Vorheriges Bild">‹</button>
-  <span class="photo-fallback" aria-hidden="true">{{ ui.icon("image") }}<span class="photo-fallback-text">Dieses Bild konnte nicht geladen werden</span></span>
+  <button type="button" class="lb-btn lb-close" aria-label="Schließen">×</button>
+  <button type="button" class="lb-btn lb-prev" aria-label="Vorheriges Bild">‹</button>
   <img id="lb-img" src="" alt="Artikelbild">
-  <button type="button" class="lb-next" aria-label="Nächstes Bild">›</button>
+  <button type="button" class="lb-btn lb-next" aria-label="Nächstes Bild">›</button>
   <span class="lb-counter" id="lb-counter"></span>
 </div>
 {% endif %}

@@ -1,72 +1,73 @@
-/* Vinted Sniper — the dashboard's visual system.
- *
- * The product is an instrument. Someone leaves this open on a second monitor and reads it
- * dozens of times a day, so every decision below is about measurement, not decoration:
- *
- *  - One neutral ramp, cool and slightly blue, so photographs sit on the surface instead
- *    of fighting it. Light and dark are both first-class and follow the system.
- *  - Depth comes from hairline rules, not shadows. A raised panel is one pixel lighter
- *    and one rule stronger than the ground it sits on. Shadows are reserved for things
- *    that genuinely float above the page — the drawer, the lightbox, the mobile sheet.
- *  - Radii are small and consistent. 3px on a field you type into, 6px on a panel, a pill
- *    only where something is genuinely a pill. Nothing here is a lozenge.
- *  - Spacing is a 4px grid, named rather than repeated, so two panels that should line up
- *    actually do.
- *  - Every figure in the interface is tabular. Columns of numbers that shift as they
- *    change are unreadable, and this is a page of columns of numbers.
- *  - Type is one system sans. Fixed sizes, tight scale, tracking set per size rather than
- *    once for the page. Only standard weights — variable weights snap unpredictably.
- *  - Colour is spent on state. One accent, four status hues, each meaning one thing, none
- *    of them decorative.
- *  - Motion conveys state and nothing else: a press, a hover, a panel arriving. 150–220ms,
- *    one settle curve, gated behind prefers-reduced-motion.
- */
+/* =============================================================================
+   vinted-sniper — Kontrollzentrale
+   -----------------------------------------------------------------------------
+   An application, not a website. Desktop-first, control-centre, built to sit on a
+   second monitor all day.
+
+   The organising idea: the interface is grey until it isn't. The resting state of
+   this tool is greyscale. Accent means hot or active. Semantic red means broken.
+   Colour is information. Nothing here is colour for its own sake.
+
+   Depth is declared once per layer and never twice on the same element. A 1px
+   border under a wide soft shadow is a ghost card, and a ghost card is the single
+   most common way an interface stops looking built.
+   ========================================================================== */
+
+/* --- Tokens ---------------------------------------------------------------- */
 
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
 
-  /* --- Neutrals ---------------------------------------------------------------
-   * The instrument's grey. Cool, low-chroma, and stepped so that each surface is
-   * exactly one step from the one behind it. */
-  --bg: #eceef0;
+  /* Surfaces, from the page down to a recessed well. Six steps is enough to build a
+     whole chassis without inventing a shade per component. */
+  --bg: #f4f6f7;
+  --bg-wash: #e9edef;
   --surface: #ffffff;
-  --surface-2: #f6f7f8;
-  --surface-3: #e9ebee;
-  --sunken: #e2e5e9;
+  --surface-2: #f8fafb;
+  --surface-3: #eef2f4;
+  --rail: #eef1f2;
 
-  --line: #d9dde2;
-  --line-strong: #b6bec7;
+  /* Ink, from the loudest text to the quietest. --ink-3 is the last tier that can
+     carry text: it clears 4.5:1 on both --surface and --surface-2 in both themes.
+     --ink-4 is GRAPHIC ONLY — a scrollbar thumb, a hover border, a decorative glyph.
+     It is not a text colour at any value, because no value of it clears 4.5:1 and
+     still reads as a fourth tier. An earlier pass used it for the age on a cold
+     tile and the muted figure in a readout; the contrast audit caught both. */
+  --ink-1: #0d1418;
+  --ink-2: #3d4b53;
+  --ink-3: #616e77;
+  --ink-4: #8c99a1;
 
-  --ink: #10151a;
-  --ink-2: #47525f;
-  /* The faintest ink still has to be readable on the *lightest* thing it lands on
-     (a sunken well, a raised chip), not just on white — so it is stepped against
-     --sunken rather than --surface, which is what actually sets the floor. */
-  --ink-3: #5c6773;
+  --line: #dde3e6;
+  --line-strong: #c2ccd1;
 
-  /* --- Accent -----------------------------------------------------------------
-   * One accent, and it is Vinted's own teal: the tool is about that marketplace, so
-   * carrying its colour is product truth rather than styling. Deepened for light
-   * ground so it holds contrast, brightened for dark. Never used for decoration —
-   * primary actions, the current selection, and nothing else. */
   --accent: #0a7076;
-  --accent-hover: #095e63;
   --accent-ink: #ffffff;
-  --accent-wash: rgba(10, 112, 118, 0.09);
-  --accent-line: rgba(10, 112, 118, 0.32);
+  --accent-soft: #e2eff0;
+  --accent-line: #7fb6b9;
 
-  /* --- Status -----------------------------------------------------------------
-   * Each hue means exactly one thing and is never borrowed for anything else. */
-  --ok: #10714a;
-  --ok-wash: rgba(16, 113, 74, 0.1);
+  --ok: #1c6b45;
+  --ok-soft: #e4f0e9;
   --warn: #8a5a06;
-  --warn-wash: rgba(138, 90, 6, 0.1);
-  --bad: #ac2038;
-  --bad-wash: rgba(172, 32, 56, 0.09);
-  --info: #1a4fa0;
-  --info-wash: rgba(26, 79, 160, 0.09);
+  --warn-soft: #f6ecdb;
+  --bad: #a32a20;
+  --bad-soft: #f8e8e6;
 
-  /* --- Spacing: a 4px grid, named ------------------------------------------------ */
+  /* Type. One family, seven steps, a tight ratio. A product UI has more type
+     elements on screen than a marketing page, and exaggerated contrast turns that
+     into noise. Tabular figures are the default for anything numeric. */
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+  --t-figure: 1.75rem;
+  --t-title: 1.25rem;
+  --t-section: 1rem;
+  --t-body: 0.9375rem;
+  --t-meta: 0.8125rem;
+  --t-small: 0.75rem;
+  --t-label: 0.6875rem;
+
+  /* Spacing on a 4px grid. */
   --s1: 0.25rem;
   --s2: 0.5rem;
   --s3: 0.75rem;
@@ -75,213 +76,120 @@
   --s6: 1.5rem;
   --s8: 2rem;
   --s10: 2.5rem;
-  --s12: 3rem;
+  --section-gap: 2rem;
 
-  /* --- Radius: small and consistent ---------------------------------------------- */
-  --r-xs: 3px;
-  --r-sm: 4px;
-  --r: 6px;
-  --r-lg: 8px;
+  --measure: 68ch;
+
+  --r-xs: 2px;
+  --r-sm: 3px;
+  --r: 4px;
   --r-pill: 999px;
 
-  /* --- Depth: three planes and no more --------------------------------------------
-   * Every shadow is tinted to the neutral it sits on rather than to black. A pure-black
-   * shadow on a cool grey reads as dirt on the surface; the same shadow tinted to the ink
-   * reads as the surface standing slightly proud of what is behind it.
-   *
-   * The rule for when a surface gets one: a hairline separates a panel, because a panel
-   * is not something you act on. Anything you can click, hover or scroll gets a resting
-   * elevation as well, because it has to say so before the pointer arrives. */
-  --elev-1: 0 1px 2px rgba(16, 21, 26, 0.045);
-  --elev-2: 0 1px 2px rgba(16, 21, 26, 0.05), 0 6px 16px rgba(16, 21, 26, 0.07);
-  --elev-3: 0 2px 6px rgba(16, 21, 26, 0.07), 0 18px 44px rgba(16, 21, 26, 0.13);
+  /* Depth. Declared once per layer. --elev-float is the only shadow allowed on
+     something that is not actually floating. */
+  --elev-1: 0 1px 2px rgb(13 20 24 / 0.05);
+  --elev-float: 0 1px 2px rgb(13 20 24 / 0.06), 0 8px 24px rgb(13 20 24 / 0.09);
+  --elev-overlay: 0 2px 6px rgb(13 20 24 / 0.08), 0 20px 48px rgb(13 20 24 / 0.16);
 
-  --shadow-scrim: 0 0 0 100vmax rgba(12, 16, 20, 0.5);
+  /* Motion. 120-180ms, custom curves, no linear and no ease-in on UI. */
+  --t-fast: 120ms;
+  --t-base: 160ms;
+  --t-slow: 260ms;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --settle: cubic-bezier(0.22, 0.68, 0.32, 1);
 
-  /* --- Z-index: a documented scale, not numbers sprinkled where they were needed.
-   * The two that were previously arbitrary (39 and 40) sat either side of the topbar
-   * for no stated reason, which is exactly how a drawer ends up under the header. */
-  --z-topbar: 20;
+  /* Z-index. A scale, not a set of guesses. */
+  --z-rail: 10;
+  --z-header: 20;
   --z-scrim: 30;
   --z-drawer: 40;
-  --z-pop: 60;
-  --z-lightbox: 80;
-  --z-skip: 100;
+  --z-pop: 50;
+  --z-lightbox: 60;
+  --z-skip: 70;
 
-  /* --- Focus: one ring, used everywhere ----------------------------------------- */
-  --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
-
-  /* --- Type -----------------------------------------------------------------------
-   * Tracking is set per size. Large text reads too far apart at the same tracking that
-   * small text needs, so one value for the page is always wrong at one of the ends. */
-  --track-tight: -0.015em;
-  --track-tightest: -0.021em;
-  --track-normal: -0.003em;
-  --track-wide: 0.06em;
-
-  /* A scale, so two things that should be the same size are, and so the gap between
-     one step and the next is a decision rather than a habit. Seven steps, used
-     everywhere; anything needing an eighth is a sign the piece wants two sizes, not
-     nine. */
-  --t-figure: 2rem;
-  --t-title: 1.0625rem;
-  --t-section: 0.9375rem;
-  --t-body: 0.875rem;
-  --t-meta: 0.8125rem;
-  --t-small: 0.75rem;
-  --t-label: 0.6875rem;
-
-  /* One family, deliberately. This page has to open offline, behind a login, with no
-     build step, so a webfont would be one more request and one more failure mode; the
-     system stack is also what the reader already has tuned for their own screen. It is
-     not Inter, Roboto or Arial: it resolves to whatever the machine actually draws
-     with, which is the point. Numbers are the exception, and they are not a second
-     family either: tabular figures in the same sans, set one step tighter, so a column
-     of them is a ruled grid rather than a row of guesses. */
-  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
-    Arial, sans-serif;
-  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas,
-    monospace;
-
-  /* --- Motion ------------------------------------------------------------------- */
-  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
-  --settle: cubic-bezier(0.32, 0.72, 0, 1);
-  --t-press: 90ms;
-  --t-fast: 150ms;
-  --t-base: 200ms;
-
-  /* --- Frame --------------------------------------------------------------------- */
-  --sidebar-w: 15.5rem;
-  --topbar-h: 3.5rem;
-  --content-max: 104rem;
-  --measure: 46rem;
-  /* The rhythm between sections. Named because it appears on every page and has to be the
-     same on all of them; a section that starts higher than the last one reads as a
-     mistake even when nobody can say what the mistake was. */
-  --section-gap: var(--s10);
+  /* Freshness decay. The window a find stays worth acting on. */
+  --decay-window: 900s;
 }
 
-:root[data-theme="dark"] {
-  /* The same ramp, stepped for a dim room. Not an inversion: dark ground, and each
-     surface one step lighter than the one behind it, so depth still reads. */
-  --bg: #121518;
-  --surface: #191d21;
-  --surface-2: #1f242a;
-  --surface-3: #262c33;
-  --sunken: #0e1114;
-  --line: #2b3238;
-  --line-strong: #3d454e;
-  --ink: #e7ebef;
-  --ink-2: #a3aeb9;
-  /* Stepped against --surface-3, the lightest surface it lands on here, for the
-     same reason the light ramp steps against --sunken. */
-  --ink-3: #8994a0;
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0c1013;
+  --bg-wash: #080b0d;
+  --surface: #141a1e;
+  --surface-2: #1a2226;
+  --surface-3: #212b30;
+  --rail: #11171b;
+
+  --ink-1: #e8eef0;
+  --ink-2: #b6c2c7;
+  --ink-3: #8b989e;
+  --ink-4: #6b777d;
+
+  --line: #263137;
+  --line-strong: #35434a;
+
   --accent: #23b2ab;
-  --accent-hover: #35c4bc;
-  --accent-ink: #04201f;
-  --accent-wash: rgba(35, 178, 171, 0.12);
-  --accent-line: rgba(35, 178, 171, 0.36);
-  --ok: #3fca8b;
-  --ok-wash: rgba(63, 202, 139, 0.13);
+  --accent-ink: #06231f;
+  --accent-soft: #13312f;
+  --accent-line: #1d6b68;
+
+  --ok: #5fc48d;
+  --ok-soft: #12301f;
   --warn: #d9a441;
-  --warn-wash: rgba(217, 164, 65, 0.13);
-  --bad: #ef7186;
-  --bad-wash: rgba(239, 113, 134, 0.13);
-  --info: #6aa6f0;
-  --info-wash: rgba(106, 166, 240, 0.13);
-  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.34);
-  --elev-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 16px rgba(0, 0, 0, 0.42);
-  --elev-3: 0 2px 6px rgba(0, 0, 0, 0.4), 0 18px 44px rgba(0, 0, 0, 0.58);
-  --shadow-scrim: 0 0 0 100vmax rgba(0, 0, 0, 0.62);
-  --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+  --warn-soft: #33260f;
+  --bad: #e8776c;
+  --bad-soft: #341916;
+
+  --elev-1: 0 1px 2px rgb(0 0 0 / 0.3);
+  --elev-float: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.46);
+  --elev-overlay: 0 2px 6px rgb(0 0 0 / 0.5), 0 20px 48px rgb(0 0 0 / 0.6);
 }
 
-/* Two ways to arrive at the dark ramp: the system asked for it, or the person did.
-   `data-theme="light"` has to beat the system, hence the :not() — without it a person
-   who picked light on a dark-mode machine would still be shown dark. */
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    /* The same ramp, stepped for a dim room. Not an inversion: dark ground, and each
-       surface one step lighter than the one behind it, so depth still reads. */
-    --bg: #121518;
-    --surface: #191d21;
-    --surface-2: #1f242a;
-    --surface-3: #262c33;
-    --sunken: #0e1114;
-    --line: #2b3238;
-    --line-strong: #3d454e;
-    --ink: #e7ebef;
-    --ink-2: #a3aeb9;
-    --ink-3: #8994a0;
+  [data-theme="system"] {
+    color-scheme: dark;
+
+    --bg: #0c1013;
+    --bg-wash: #080b0d;
+    --surface: #141a1e;
+    --surface-2: #1a2226;
+    --surface-3: #212b30;
+    --rail: #11171b;
+
+    --ink-1: #e8eef0;
+    --ink-2: #b6c2c7;
+    --ink-3: #8b989e;
+    --ink-4: #6b777d;
+
+    --line: #263137;
+    --line-strong: #35434a;
+
     --accent: #23b2ab;
-    --accent-hover: #35c4bc;
-    --accent-ink: #04201f;
-    --accent-wash: rgba(35, 178, 171, 0.12);
-    --accent-line: rgba(35, 178, 171, 0.36);
-    --ok: #3fca8b;
-    --ok-wash: rgba(63, 202, 139, 0.13);
+    --accent-ink: #06231f;
+    --accent-soft: #13312f;
+    --accent-line: #1d6b68;
+
+    --ok: #5fc48d;
+    --ok-soft: #12301f;
     --warn: #d9a441;
-    --warn-wash: rgba(217, 164, 65, 0.13);
-    --bad: #ef7186;
-    --bad-wash: rgba(239, 113, 134, 0.13);
-    --info: #6aa6f0;
-    --info-wash: rgba(106, 166, 240, 0.13);
-    --elev-1: 0 1px 2px rgba(0, 0, 0, 0.34);
-    --elev-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 16px rgba(0, 0, 0, 0.42);
-    --elev-3: 0 2px 6px rgba(0, 0, 0, 0.4), 0 18px 44px rgba(0, 0, 0, 0.58);
-    --shadow-scrim: 0 0 0 100vmax rgba(0, 0, 0, 0.62);
-    --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+    --warn-soft: #33260f;
+    --bad: #e8776c;
+    --bad-soft: #341916;
+
+    --elev-1: 0 1px 2px rgb(0 0 0 / 0.3);
+    --elev-float: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.46);
+    --elev-overlay: 0 2px 6px rgb(0 0 0 / 0.5), 0 20px 48px rgb(0 0 0 / 0.6);
   }
 }
 
-/* --- Reset ------------------------------------------------------------------------ */
+/* --- Reset ----------------------------------------------------------------- */
+
 *,
 *::before,
 *::after {
   box-sizing: border-box;
-}
-
-/* The `hidden` attribute is how this interface hides things, and it loses. Any rule that
-   sets `display` outranks the user-agent's `[hidden] { display: none }`, because the
-   author sheet wins on specificity — so `.lightbox { display: grid }` silently pinned the
-   photo overlay open across every page that had one, under the whole interface. This one
-   line makes the attribute mean what it says everywhere, and it is the only place in the
-   stylesheet that uses !important: it has to outrank the author sheet to be worth having. */
-[hidden] {
-  display: none !important;
-}
-
-/* Scrollbars are part of the product, not the operating system's. There are four of them
-   on screen at any moment — the page, each table, the brand combobox, the option lists —
-   and the default one is a 15px grey slab that makes the panel look unfinished. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
-}
-
-::-webkit-scrollbar {
-  width: 0.625rem;
-  height: 0.625rem;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  border: 3px solid transparent;
-  background: var(--line-strong);
-  background-clip: content-box;
-  border-radius: var(--r-pill);
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--ink-3);
-  background-clip: content-box;
-}
-
-::-webkit-scrollbar-corner {
-  background: transparent;
 }
 
 html {
@@ -291,73 +199,128 @@ html {
 body {
   margin: 0;
   background: var(--bg);
-  color: var(--ink);
+  color: var(--ink-1);
   font-family: var(--font);
   font-size: var(--t-body);
   line-height: 1.5;
-  letter-spacing: var(--track-normal);
   -webkit-font-smoothing: antialiased;
-  /* Every number in the interface lines up in its column. */
-  font-variant-numeric: tabular-nums;
-  /* Chrome and content are different planes, and they are told apart by edge as well as
-     by lightness: a 60px gradient down each scroll container, so the eye finds the
-     boundary of the page before it finds any content. Subtle enough to read as a
-     lighting difference rather than as a coloured panel. */
-  background-image: linear-gradient(180deg, var(--bg), var(--bg) 62px, transparent 180px);
-  background-repeat: no-repeat;
-  background-attachment: fixed;
+}
+
+/* The author sheet wins on specificity over the user agent's [hidden] rule, so a
+   display: grid on an overlay silently pinned it open across every page that had one.
+   This is the only !important in the file; it has to outrank the author sheet to be
+   worth having. */
+[hidden] {
+  display: none !important;
 }
 
 h1,
 h2,
-h3 {
+h3,
+h4,
+p,
+figure,
+dl,
+dd {
   margin: 0;
-  font-weight: 600;
-  letter-spacing: var(--track-tight);
-  line-height: 1.25;
-  /* A heading that wraps to one orphan word is a typesetting accident. Balancing is a
-     one-line fix that costs nothing and reads as someone having set it properly. */
-  text-wrap: balance;
 }
 
-p {
+ul,
+ol {
   margin: 0;
-  /* …and the same argument one step down: the last line of a paragraph should not be a
-     single short word stranded against the left edge. */
-  text-wrap: pretty;
+  padding: 0;
+  list-style: none;
 }
 
 a {
   color: var(--accent);
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
+  text-decoration-thickness: 1px;
   text-underline-offset: 2px;
 }
 
-img,
-svg {
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+img {
   display: block;
+  max-width: 100%;
+}
+
+/* One icon system. An inline SVG carries no intrinsic size, so without this it
+   stretches to whatever its flex container offers — which is how a 16px chevron
+   turns into a full-column illustration. 1.05em keeps it in step with whatever
+   size of text it sits in; the few places that need a fixed size say so. */
+.ico {
+  width: 1.05em;
+  height: 1.05em;
+  flex: none;
+  vertical-align: -0.15em;
+}
+
+.brand .mark .ico,
+.dest-icon .ico {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.nav-link .ico {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.btn .ico {
+  width: 1rem;
+  height: 1rem;
+}
+
+.listing-meta .ico,
+.listing-foot .ico {
+  width: 0.85em;
+  height: 0.85em;
+}
+
+.empty > .ico {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.flash .ico,
+.attention-row > .ico,
+.triage-allclear .ico {
+  width: 1.1rem;
+  height: 1.1rem;
 }
 
 svg {
   flex: none;
 }
 
-/* One ring, everywhere, and it is drawn outside the element so it never shifts the
-   layout or clips against a neighbouring panel. The 2px inner ring in the token is the
-   page colour: without it the ring thins out wherever it crosses a rule. */
-:focus-visible {
-  outline: none;
-  box-shadow: var(--focus);
-  border-radius: var(--r-sm);
+fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
+/* Browser surfaces. These ship with the browser and belong to no design system —
+   theming them is the cheapest signal that a page was built rather than assembled. */
 ::selection {
-  background: var(--accent-wash);
-  color: var(--ink);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+:where(input, select, textarea) {
+  caret-color: var(--accent);
 }
 
 .visually-hidden {
@@ -372,41 +335,305 @@ svg {
 }
 
 .skip-link {
-  position: absolute;
+  position: fixed;
   top: var(--s2);
   left: var(--s2);
   z-index: var(--z-skip);
   padding: var(--s2) var(--s4);
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-sm);
-  color: var(--ink);
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: var(--r);
   font-weight: 600;
+  text-decoration: none;
   transform: translateY(-200%);
-  transition: transform var(--t-fast) var(--ease);
 }
 
 .skip-link:focus {
   transform: none;
+}
+
+/* Thin scrollbars, themed. Scrollbars are part of the product, not the OS. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: var(--r-pill);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-4);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* --- Application shell ------------------------------------------------------ */
+
+.app {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.rail {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-rail);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s6);
+  height: 100vh;
+  height: 100dvh;
+  padding: var(--s5) var(--s4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--rail);
+  /* The rail gets its own plane so the content column reads as the working
+     surface and the navigation as the frame around it. */
+  background-image: linear-gradient(168deg, var(--surface-2) 0%, var(--rail) 60%);
+  border-right: 1px solid var(--line);
+}
+
+.brand {
+  display: flex;
+  gap: var(--s2);
+  align-items: center;
+  padding: var(--s1) var(--s2);
+  color: var(--ink-1);
+  font-weight: 650;
+  letter-spacing: -0.01em;
   text-decoration: none;
+}
+
+.brand .mark {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: var(--r);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0 calc(-1 * var(--s2));
+}
+
+.nav-label {
+  padding: var(--s4) var(--s2) var(--s1);
+  color: var(--ink-3);
+  font-size: var(--t-label);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.nav-link {
+  display: flex;
+  gap: var(--s3);
+  align-items: center;
+  padding: var(--s2) var(--s2);
+  color: var(--ink-2);
+  border-radius: var(--r);
+  text-decoration: none;
+  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+
+.nav-link:hover {
+  background: var(--surface-3);
+  color: var(--ink-1);
+}
+
+.nav-link[aria-current="page"] {
+  background: var(--surface);
+  color: var(--ink-1);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.nav-link .count {
+  margin-left: auto;
+  padding: 0 var(--s2);
+  color: var(--ink-3);
+  background: var(--surface-3);
+  border-radius: var(--r-pill);
+  font-size: var(--t-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.nav-link[aria-current="page"] .count {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.rail-foot {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  margin-top: auto;
+}
+
+/* The heartbeat. Not decoration: it is the one place the running state is visible
+   without navigating, and it breathes only while the last poll was recent. */
+.pulse {
+  display: flex;
+  gap: var(--s2);
+  align-items: center;
+  padding: var(--s2) var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  font-size: var(--t-small);
+  font-weight: 600;
+}
+
+.pulse .dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  background: var(--ok);
+  border-radius: 50%;
+}
+
+.pulse.warn .dot {
+  background: var(--warn);
+}
+
+.pulse.bad .dot {
+  background: var(--bad);
+}
+
+.pulse .since {
+  margin-left: auto;
+  color: var(--ink-3);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* --- Header ---------------------------------------------------------------- */
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-header);
+  display: flex;
+  gap: var(--s4);
+  align-items: center;
+  padding: var(--s4) var(--s6);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  border-bottom: 1px solid var(--line);
+}
+
+@supports (backdrop-filter: blur(1px)) {
+  .header {
+    background: color-mix(in srgb, var(--bg) 72%, transparent);
+    backdrop-filter: blur(16px) saturate(1.5);
+  }
+}
+
+.header h1 {
+  font-size: var(--t-title);
+  font-weight: 620;
+  letter-spacing: -0.015em;
+}
+
+.header .spacer {
+  flex: 1;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--section-gap);
+  width: 100%;
+  max-width: 84rem;
+  padding: var(--s6);
+}
+
+.menu-toggle {
+  display: none;
+}
+
+.nav-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-scrim);
+  background: rgb(8 11 13 / 0.45);
+}
+
+/* --- Section heads --------------------------------------------------------- */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.section-head {
+  display: flex;
+  gap: var(--s3);
+  align-items: baseline;
+  padding-bottom: var(--s2);
+  border-bottom: 1px solid var(--line);
+}
+
+.section-head h2 {
+  font-size: var(--t-section);
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+
+.section-head .spacer {
+  flex: 1;
+}
+
+.section-note {
+  max-width: var(--measure);
+  margin-bottom: var(--s3);
+  color: var(--ink-3);
+  font-size: var(--t-meta);
+}
+
+.section-note:last-child {
+  margin-bottom: 0;
+}
+
+.hint {
+  color: var(--ink-3);
+  font-size: var(--t-meta);
 }
 
 .muted {
   color: var(--ink-3);
 }
 
-.faint {
-  color: var(--ink-3);
-  font-weight: 400;
-}
-
 .nowrap {
   white-space: nowrap;
-}
-
-.mono {
-  font-family: var(--mono);
-  font-size: 0.875em;
 }
 
 .text-bad {
@@ -417,1102 +644,378 @@ svg {
   color: var(--warn);
 }
 
-.inline {
-  display: inline;
+.faint {
+  color: var(--ink-3);
 }
 
-.spacer {
-  flex: 1;
+.mono {
+  font-family: var(--mono);
+  font-size: 0.9em;
 }
 
-.mt-sm {
-  margin-top: var(--s3);
-}
+/* --- Triage header ---------------------------------------------------------
+   The product's news is two kinds: a fresh drop is a win, a dead destination is a
+   loss. Flattening both into one statusbar and four equal tiles is what made the
+   old dashboard unable to distinguish a bad day from a good one — both rendered as
+   four neutral numbers.
 
-.mt-md {
-  margin-top: var(--s5);
-}
+   So the first screen is two zones in one instrument, split by a hairline. They can
+   disagree, and when they do the problem is visible without reading anything.
+   These are readouts in a gauge cluster, not cards: a card per number would be the
+   hero-metric template the craft floor bans, applied six times.
+   ------------------------------------------------------------------------- */
 
-/* --- App shell ---------------------------------------------------------------------
- * A fixed sidebar and a sticky top bar over a scrolling content column. Desktop is the
- * primary experience; the drawer below is for when there is not one. */
-.app {
+.triage {
   display: grid;
-  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
-  min-height: 100dvh;
-}
-
-.sidebar {
-  position: sticky;
-  top: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s6);
-  height: 100dvh;
-  padding: var(--s5) var(--s4);
-  /* The rail recedes rather than presents itself: a gradient that lightens away from the
-     content edge, so the boundary between chrome and page is a change in light rather
-     than a rule you have to look for. */
-  background: linear-gradient(
-    100deg,
-    var(--surface-2) 0%,
-    var(--surface-2) 55%,
-    color-mix(in srgb, var(--bg) 55%, var(--surface-2)) 100%
-  );
-  border-right: 1px solid var(--line);
-  /* The footer is pinned to the bottom by margin-top:auto, which means a long status
-     block plus a long nav pushes it off the screen with no way to reach it — the logout
-     button simply disappears on a short window. Let the rail scroll instead. */
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-.brand {
-  display: flex;
-  gap: var(--s3);
-  align-items: center;
-  padding: var(--s1) var(--s2);
-  color: var(--ink);
-  font-size: 0.9375rem;
-  font-weight: 600;
-  letter-spacing: var(--track-tightest);
-}
-
-.brand:hover {
-  text-decoration: none;
-}
-
-/* The mark is the one place the accent appears as a fill, because it is the thing you
-   are looking for when the window is small. */
-.brand .mark {
-  display: grid;
-  place-items: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  background: var(--accent);
-  color: var(--accent-ink);
-  border-radius: var(--r-sm);
-}
-
-.brand .mark svg {
-  width: 1.05rem;
-  height: 1.05rem;
-}
-
-.nav {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.nav-link {
-  display: flex;
-  gap: var(--s3);
-  align-items: center;
-  padding: var(--s2) var(--s3);
-  border-radius: var(--r-sm);
-  color: var(--ink-2);
-  font-size: var(--t-body);
-  font-weight: 500;
-  letter-spacing: var(--track-normal);
-  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease),
-    transform var(--t-fast) var(--ease);
-}
-
-.nav-link svg {
-  width: 1.0625rem;
-  height: 1.0625rem;
-  color: var(--ink-3);
-  transition: color var(--t-fast) var(--ease);
-}
-
-/* Two pixels. Enough that the row answers the pointer before the pointer arrives at it,
-   small enough that a run of five links does not look like a slot machine. */
-.nav-link:hover {
-  background: var(--surface-3);
-  color: var(--ink);
-  text-decoration: none;
-  transform: translateX(2px);
-}
-
-/* …but the current page sits where it sits. Letting it drift on hover would suggest it
-   could move, which is the one thing a position indicator must never do. */
-.nav-link[aria-current="page"]:hover {
-  transform: none;
-}
-
-.nav-link:hover svg {
-  color: var(--ink-2);
-}
-
-/* Current page: a rule at the edge of the sidebar, not a filled pill. It reads as a
-   position on a scale rather than a button, and it does not fight the accent. */
-.nav-link[aria-current="page"] {
+  grid-template-columns: 1fr 1px 1fr;
   background: var(--surface);
-  color: var(--ink);
-  font-weight: 600;
-  box-shadow: inset 2px 0 0 var(--accent);
-}
-
-.nav-link[aria-current="page"] svg {
-  color: var(--accent);
-}
-
-.nav-link .count {
-  margin-left: auto;
-  padding: 0 var(--s2);
-  min-width: 1.375rem;
-  border-radius: var(--r-xs);
-  background: var(--surface-3);
-  color: var(--ink-3);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  text-align: center;
-  line-height: 1.375rem;
-}
-
-.sidebar-foot {
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s3);
-}
-
-.sidebar-status {
-  padding: var(--s3);
-  border: 1px solid var(--line);
-  border-left: 2px solid var(--ok);
-  border-radius: var(--r-sm);
-  background: var(--surface);
-}
-
-.sidebar-status.is-bad {
-  border-left-color: var(--bad);
-}
-
-.sidebar-status .label {
-  display: flex;
-  gap: var(--s2);
-  align-items: center;
-  color: var(--ink);
-  font-size: 0.8125rem;
-  font-weight: 600;
-}
-
-.sidebar-status .label svg {
-  width: 0.875rem;
-  height: 0.875rem;
-  color: var(--ok);
-}
-
-.sidebar-status.is-bad .label svg {
-  color: var(--bad);
-}
-
-.sidebar-status-detail {
-  margin-top: 2px;
-  color: var(--ink-3);
-  font-size: 0.75rem;
-  line-height: 1.4;
-}
-
-.main {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-/* The top bar is chrome, not a heading page: one hairline under it, and the page title
-   is the only thing in it besides the actions. */
-.topbar {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-topbar);
-  display: flex;
-  gap: var(--s4);
-  align-items: center;
-  min-height: var(--topbar-h);
-  padding: var(--s3) var(--s6);
-  /* Opaque first, so a browser without color-mix gets a solid bar and never a hole.
-     The bar is the one element that sits over moving content, so it earns the only
-     backdrop filter in the interface — and it is sticky, never a scrolling container, so
-     the blur is composited once per frame on a fixed-size layer. */
-  background: var(--bg);
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  border-bottom: 1px solid var(--line);
-}
-
-@supports (backdrop-filter: blur(2px)) {
-  .topbar {
-    /* 85%, not less. A frosted bar over a photograph grid is the one place on this
-       page where the page title can end up on a dark image, and near-black text on a
-       dark photograph is not a contrast problem worth taking: the blur stays for the
-       depth, the opacity stays for the legibility. */
-    background: color-mix(in srgb, var(--bg) 85%, transparent);
-    backdrop-filter: blur(16px) saturate(1.6);
-  }
-}
-
-.topbar h1 {
-  font-size: var(--t-title);
-  letter-spacing: var(--track-tightest);
-}
-
-.menu-toggle {
-  display: none;
-  padding: var(--s2);
-  background: none;
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.menu-toggle svg {
-  width: 1.125rem;
-  height: 1.125rem;
-}
-
-.content {
-  width: 100%;
-  max-width: var(--content-max);
-  /* A flex item refuses to shrink below its content by default, and the tables inside
-     are wide. Without this the whole page grows a horizontal scrollbar instead of the
-     table scrolling inside its own panel. */
-  min-width: 0;
-  padding: var(--s6);
-  padding-bottom: var(--s12);
-}
-
-.content > section + section {
-  margin-top: var(--section-gap);
-}
-
-/* --- Section heads -----------------------------------------------------------------
- * One pattern for every section on every page: a title, optional meta on the right. */
-.section-head {
-  display: flex;
-  gap: var(--s4);
-  align-items: baseline;
-  margin-bottom: var(--s4);
-}
-
-.section-head h2 {
-  font-size: 0.9375rem;
-  letter-spacing: var(--track-tight);
-}
-
-.section-head .hint,
-.section-head .muted {
-  font-size: 0.8125rem;
-}
-
-.group-label {
-  display: block;
-  margin-bottom: var(--s2);
-  color: var(--ink-3);
-  font-size: var(--t-label);
-  font-weight: 600;
-  letter-spacing: var(--track-wide);
-  text-transform: uppercase;
-}
-
-/* The form really is a sequence, so the groups are numbered — but the number is a
-   figure set in a sunken well rather than a character in the label. "1 · Wonach gesucht
-   wird" is a caption; this is an index on an instrument panel. */
-.group-label .step {
-  display: inline-grid;
-  place-items: center;
-  width: 1.125rem;
-  height: 1.125rem;
-  margin-right: var(--s2);
-  background: var(--sunken);
-  border: 1px solid var(--line);
-  border-radius: var(--r-xs);
-  color: var(--ink-2);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
-  vertical-align: -0.1875rem;
-}
-
-.section-note {
-  margin-top: var(--s4);
-  max-width: var(--measure);
-  color: var(--ink-3);
-  font-size: var(--t-small);
-  line-height: 1.6;
-}
-
-/* --- Theme switcher -------------------------------------------------------------------
- * Three positions on one rail, so the current choice is readable at a glance without
- * opening anything. The pressed segment takes the accent, because it is the only state
- * on this control that is an answer rather than an offer. */
-.theme-switch {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 2px;
-  padding: 2px;
-  background: var(--surface-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-}
-
-.theme-option {
-  display: grid;
-  place-items: center;
-  height: 1.75rem;
-  padding: 0;
-  background: none;
-  border: 0;
-  border-radius: var(--r-xs);
-  color: var(--ink-3);
-  cursor: pointer;
-  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
-}
-
-.theme-option svg {
-  width: 0.9375rem;
-  height: 0.9375rem;
-}
-
-.theme-option:hover {
-  background: var(--surface);
-  color: var(--ink);
-}
-
-.theme-option[aria-pressed="true"] {
-  background: var(--accent);
-  color: var(--accent-ink);
-}
-
-/* --- Panels --------------------------------------------------------------------------
- * Hairline plus a quarter-step of elevation. The hairline is what draws the edge; the
- * elevation is what stops the panel from looking like a hole cut in the page. At 4.5%
- * alpha the second one is almost invisible on its own, which is the point: it is felt
- * rather than seen, and the panels finally read as plates laid on a ground. */
-.card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  box-shadow: var(--elev-1);
-}
-
-.card-pad {
-  padding: var(--s6);
-}
-
-.form-narrow {
-  max-width: var(--measure);
-}
-
-/* --- System status bar ---------------------------------------------------------------- */
-.statusbar {
-  display: flex;
-  gap: var(--s3);
-  align-items: center;
-  padding: var(--s3) var(--s4);
-  margin-bottom: var(--s6);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-left: 2px solid var(--ok);
-  border-radius: var(--r-sm);
-  box-shadow: var(--elev-1);
-  font-size: var(--t-body);
-}
-
-.statusbar.warn {
-  border-left-color: var(--warn);
-}
-
-.statusbar.bad {
-  border-left-color: var(--bad);
-}
-
-.statusbar .dot {
-  width: 0.4375rem;
-  height: 0.4375rem;
-  border-radius: var(--r-pill);
-  background: var(--ok);
-}
-
-.statusbar.warn .dot {
-  background: var(--warn);
-}
-
-.statusbar.bad .dot {
-  background: var(--bad);
-}
-
-.statusbar .nowrap {
-  color: var(--ink-3);
-  font-size: var(--t-meta);
-}
-
-/* --- Stat tiles ------------------------------------------------------------------------
- * Label, figure, context — in that order, always. The figure is the loudest thing in the
- * tile because it is the only thing anyone came for. */
-.stat-grid {
-  display: flex;
-  flex-wrap: wrap;
-  /* Flex, not grid, and for a specific reason: the two pages that show this row have
-     four figures and five figures respectively. A fixed four-column grid parks the fifth
-     tile alone on a second row beside three empty cells — a large dead panel, drawn with
-     the line colour, that looks like something failed to load. Grid cannot express "as
-     many as fit, and never any empty ones"; wrapping flex items can. */
-  gap: 1px;
-  background: var(--line);
   border: 1px solid var(--line);
   border-radius: var(--r);
   overflow: hidden;
 }
 
-/* The gap-and-background trick draws the grid as real hairlines rather than as borders
-   on every tile, which is one rule instead of four. */
-.stat {
-  /* 12rem is the point at which "in den letzten 7 Tagen" stops wrapping. Below it the
-     tile wraps onto the next line rather than squeezing its own figure. */
-  flex: 1 1 12rem;
-  padding: var(--s5) var(--s6);
-  background: var(--surface);
+.triage-rule {
+  background: var(--line);
 }
 
-.stat .label {
+/* One zone instead of two. The split is what makes the dashboard's two kinds of
+   news comparable; a page with a single group of figures does not need a
+   divider, and a divider with nothing on the far side of it reads as a bug. */
+.triage-single {
+  grid-template-columns: 1fr;
+}
+
+.triage-zone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  padding: var(--s4) var(--s5);
+}
+
+.triage-zone > h2 {
+  color: var(--ink-3);
+  font-size: var(--t-label);
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.triage-readouts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.readout {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 var(--s5);
+  border-left: 1px solid var(--line);
+}
+
+.readout:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.readout dt {
+  color: var(--ink-3);
+  font-size: var(--t-label);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.readout dd {
+  font-size: var(--t-title);
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.readout.is-quiet dd {
+  color: var(--ink-3);
+}
+
+.readout.is-bad dd {
+  color: var(--bad);
+}
+
+.readout.is-warn dd {
+  color: var(--warn);
+}
+
+.readout.is-good dd {
+  color: var(--ok);
+}
+
+.readout dd small {
+  color: var(--ink-3);
+  font-size: var(--t-small);
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+/* The "nothing needs you" state. A zone that is calm says so in words rather than
+   showing a row of zeroes, which reads like a measurement. */
+.triage-allclear {
   display: flex;
   gap: var(--s2);
   align-items: center;
-  color: var(--ink-3);
-  font-size: var(--t-label);
-  font-weight: 600;
-  letter-spacing: var(--track-wide);
-  text-transform: uppercase;
-}
-
-.stat .label svg {
-  width: 0.875rem;
-  height: 0.875rem;
-}
-
-/* The figure is the only thing anyone opened the page for, so it is the only thing on
-   it at display size. It is set one step tighter than the surrounding type and with the
-   tabular figures the body already declares: 4078 and 4 stand at the same width, so four
-   tiles read as one instrument panel instead of four unrelated numbers. */
-.stat .value {
-  margin-top: var(--s2);
-  font-size: var(--t-figure);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: var(--track-tightest);
-  line-height: 1.05;
-}
-
-.stat .hint {
-  margin-top: var(--s2);
-  color: var(--ink-3);
-  font-size: var(--t-small);
-}
-
-.stat.tone-accent .value {
-  color: var(--accent);
-}
-
-.stat.tone-ok .value {
   color: var(--ok);
-}
-
-.stat.tone-bad .value {
-  color: var(--bad);
-}
-
-/* --- Pills ------------------------------------------------------------------------------
- * A state, in a word. The word is German; the colours are the status ramp. */
-.pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.0625rem var(--s2);
-  border: 1px solid transparent;
-  border-radius: var(--r-pill);
-  font-size: 0.6875rem;
+  font-size: var(--t-body);
   font-weight: 600;
-  letter-spacing: 0.01em;
-  line-height: 1.5;
-  white-space: nowrap;
 }
 
-.pill.ok {
-  background: var(--ok-wash);
-  color: var(--ok);
-  border-color: var(--ok-wash);
+/* --- Listing tiles ---------------------------------------------------------
+   Photo-led, because a used item is judged from its photograph, and that is the
+   one thing this interface must not hide.
+
+   But the order is wrong on three of its fields, and that is not a matter of
+   taste. Vinted titles are seller-written and unreliable ("Nike pro maat s"), the
+   freshness of a find is the single most decision-relevant fact for a reseller, and
+   the total is what they actually pay. So: price and freshness first, title
+   demoted to two clamped lines, total promoted out of its grey footnote.
+   ------------------------------------------------------------------------- */
+
+.listing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+  gap: var(--s4);
 }
 
-.pill.failing,
-.pill.starting {
-  background: var(--warn-wash);
-  color: var(--warn);
-  border-color: var(--warn-wash);
-}
-
-/* "No new listings for a while" is not an error and must not borrow the error colour. */
-.pill.stale {
-  background: var(--info-wash);
-  color: var(--info);
-  border-color: var(--info-wash);
-}
-
-.pill.disabled {
-  background: var(--surface-3);
-  color: var(--ink-3);
-  border-color: var(--line);
-}
-
-.pill.plain {
-  background: var(--bad-wash);
-  color: var(--bad);
-  border-color: var(--bad-wash);
-}
-
-/* --- Tables ------------------------------------------------------------------------------ */
-/* Positioned, so that the absolutely-positioned .visually-hidden text inside a wide
-   table is clipped by this box rather than by the page. Without it that text is laid
-   out past the scroller's edge, escapes the clip entirely, and silently gives the
-   whole document a horizontal scrollbar on a phone. */
-.table-wrap {
+.listing {
   position: relative;
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
-
-/* The header is a rail, not a row of words: it gets its own plane so the columns have a
-   fixed name above them even when you have scrolled half a list of listings past it. */
-thead th {
-  padding: var(--s3) var(--s4);
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--line-strong);
-  color: var(--ink-3);
-  font-size: var(--t-label);
-  font-weight: 600;
-  letter-spacing: var(--track-wide);
-  text-align: left;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-/* …and it has to end at the panel's own rounded corners, not at the page's. */
-thead th:first-child {
-  border-top-left-radius: var(--r);
-}
-
-thead th:last-child {
-  border-top-right-radius: var(--r);
-}
-
-tbody td {
-  padding: var(--s3) var(--s4);
-  border-bottom: 1px solid var(--line);
-  vertical-align: top;
-}
-
-tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-/* Every table here is mostly facts, and facts have widths. Letting the browser share
-   the leftover space evenly spreads a two-row table into a 400px gap between "Status"
-   and "Letzte Abfrage". So every column is asked to shrink to what it is actually
-   saying, and the one column that holds running text is marked `.col-grow` and takes
-   all the slack instead. */
-thead th,
-tbody td {
-  width: 1%;
-  white-space: nowrap;
-}
-
-thead th.col-grow,
-tbody td.col-grow {
-  width: auto;
-  white-space: normal;
-}
-
-tbody tr {
-  transition: background-color var(--t-fast) var(--ease);
-}
-
-tbody tr:hover {
-  background: var(--surface-2);
-}
-
-.cell-title {
-  color: var(--ink);
-  font-weight: 600;
-}
-
-.cell-note {
-  margin-top: 1px;
-  color: var(--ink-3);
-  font-size: var(--t-meta);
-}
-
-.disclosure-row td {
-  padding: 0;
-  background: var(--surface-3);
-}
-
-.disclosure-row .card-pad {
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-}
-
-.row-actions {
   display: flex;
-  gap: var(--s1);
-  justify-content: flex-end;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+  transition: border-color var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease);
 }
 
-/* --- Buttons ------------------------------------------------------------------------------
- * One shape, three weights: quiet for everything, primary for the one thing you came to do,
- * danger for the one thing you cannot undo. */
-.btn {
-  display: inline-flex;
+.listing:hover,
+.listing:focus-within {
+  border-color: var(--line-strong);
+  box-shadow: var(--elev-float);
+}
+
+.listing-photo {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  /* Square, not portrait. A 3:4 crop makes each tile a third taller for no
+     informational gain: the photograph is there to be recognised, and a
+     recognisable garment fills a square perfectly well. Two rows fit where one
+     and a half used to, which is the entire point of a dense tool. */
+  aspect-ratio: 1 / 1;
+  background: var(--surface-3);
+  border: 0;
+  cursor: zoom-in;
+  overflow: hidden;
+}
+
+.listing-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--t-slow) var(--ease-out);
+}
+
+.listing:hover .listing-photo img {
+  transform: scale(1.03);
+}
+
+/* The fallback only appears when the photograph does not. A Vinted CDN image can
+   403 at any time, and a dead one is no reason to throw a listing away — but the
+   placeholder must not sit on top of a photo that loaded perfectly well. */
+.photo-fallback {
+  display: none;
+  position: absolute;
+  inset: 0;
+  flex-direction: column;
   gap: var(--s2);
   align-items: center;
   justify-content: center;
-  padding: 0 var(--s3);
-  height: 2rem;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-sm);
-  background: var(--surface);
-  color: var(--ink);
-  font-family: inherit;
+  color: var(--ink-3);
+  font-size: var(--t-small);
+  text-align: center;
+}
+
+.listing-photo.is-broken .photo-fallback,
+.is-broken .photo-fallback {
+  display: flex;
+}
+
+.photo-fallback .ico {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.photo-count {
+  position: absolute;
+  right: var(--s2);
+  bottom: var(--s2);
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  padding: 1px var(--s2);
+  background: rgb(8 11 13 / 0.72);
+  color: #fff;
+  border-radius: var(--r-pill);
+  font-size: var(--t-label);
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(4px);
+}
+
+.listing-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s3);
+}
+
+/* Price row. The sticker and what you actually pay, side by side, both readable. */
+.listing-price {
+  display: flex;
+  gap: var(--s2);
+  align-items: baseline;
+}
+
+.listing-price .now {
+  font-size: var(--t-body);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.listing-price .total {
+  color: var(--ink-3);
+  font-size: var(--t-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.listing-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--ink-1);
   font-size: var(--t-meta);
-  font-weight: 500;
-  letter-spacing: var(--track-normal);
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease),
-    color var(--t-fast) var(--ease), transform var(--t-press) var(--ease),
-    box-shadow var(--t-fast) var(--ease);
-}
-
-.btn svg {
-  width: 0.9375rem;
-  height: 0.9375rem;
-}
-
-.btn:hover {
-  background: var(--surface-3);
+  line-height: 1.35;
   text-decoration: none;
 }
 
-/* Feedback on the press, from 0.97, at 90ms. The click follows, so the interface has
-   already answered by the time it commits. */
-.btn:active {
-  transform: scale(0.97);
+.listing-title:hover {
+  text-decoration: underline;
 }
 
-/* The one filled control on the page, and the only one that is allowed to look like a
-   physical part. Three things make it read as machined rather than as a coloured
-   rectangle: a highlight along the top edge, as if the light is above it; a quarter-step
-   of elevation, so it sits on the panel rather than being printed into it; and a press
-   that travels further than the quiet buttons, because this is the action. */
-.btn-primary {
-  background: var(--accent);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent) 94%, var(--accent-ink)) 0%,
-    var(--accent) 62%
-  );
-  border-color: color-mix(in srgb, var(--accent) 80%, var(--ink));
-  color: var(--accent-ink);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), var(--elev-1);
-  font-weight: 600;
-}
-
-.btn-primary:hover {
-  background: var(--accent-hover);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent-hover) 94%, var(--accent-ink)) 0%,
-    var(--accent-hover) 62%
-  );
-  border-color: var(--accent-hover);
-}
-
-.btn-primary:active {
-  transform: scale(0.975);
-}
-
-.btn-quiet {
-  background: transparent;
-  border-color: transparent;
-  color: var(--ink-2);
-}
-
-.btn-quiet:hover {
-  background: var(--surface-3);
-  border-color: transparent;
-  color: var(--ink);
-}
-
-.btn-danger {
-  background: transparent;
-  border-color: transparent;
-  color: var(--bad);
-}
-
-.btn-danger:hover {
-  background: var(--bad-wash);
-  border-color: transparent;
-}
-
-.btn-sm {
-  height: 1.75rem;
-  padding: 0 var(--s2);
-  font-size: var(--t-small);
-}
-
-.btn-sm svg {
-  width: 0.8125rem;
-  height: 0.8125rem;
-}
-
-.btn:disabled,
-.btn.disabled {
-  color: var(--ink-3);
-  background: var(--surface-2);
-  border-color: var(--line);
-  cursor: not-allowed;
-}
-
-/* --- Forms -------------------------------------------------------------------------------- */
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2);
-  min-width: 0;
-}
-
-.field > label,
-.field > .label {
-  color: var(--ink-2);
-  font-size: var(--t-small);
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-input[type="text"],
-input[type="url"],
-input[type="search"],
-input[type="password"],
-input[type="number"],
-select,
-textarea {
-  width: 100%;
-  height: 2.25rem;
-  padding: 0 var(--s3);
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-xs);
-  color: var(--ink);
-  font-family: inherit;
-  font-size: var(--t-body);
-  font-variant-numeric: tabular-nums;
-  transition: border-color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease),
-    box-shadow var(--t-fast) var(--ease);
-}
-
-select {
-  padding-right: var(--s6);
-  appearance: none;
-  /* A drawn chevron rather than the platform one, so the control looks the same
-     everywhere and the arrow sits inside the field rather than beside it. */
-  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
-    linear-gradient(135deg, currentColor 50%, transparent 50%);
-  background-position: right var(--s4) center, right calc(var(--s4) - 4px) center;
-  background-size: 4px 4px, 4px 4px;
-  background-repeat: no-repeat;
-  cursor: pointer;
-}
-
-textarea {
-  height: auto;
-  padding: var(--s2) var(--s3);
-  resize: vertical;
-}
-
-input:hover,
-select:hover {
-  border-color: var(--ink-3);
-}
-
-input:focus,
-select:focus,
-textarea:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-wash);
-}
-
-input::placeholder {
-  color: var(--ink-3);
-  opacity: 1;
-}
-
-.hint {
-  color: var(--ink-3);
-  font-size: var(--t-small);
-  line-height: 1.5;
-}
-
-.form-grid {
-  display: grid;
-  gap: var(--s4);
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-}
-
-.form-grid.builder-block,
-.builder-block .form-grid {
-  margin-top: 0;
-}
-
-.span-all {
-  grid-column: 1 / -1;
-}
-
-.form-actions {
-  display: flex;
-  gap: var(--s2);
-  margin-top: var(--s6);
-}
-
-.url-row {
-  display: flex;
-  gap: var(--s2);
-}
-
-.url-row input {
-  flex: 1;
-}
-
-.url-row .btn {
-  flex: none;
-}
-
-.filters {
-  display: grid;
-  gap: var(--s4);
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
-  align-items: end;
-  margin-bottom: var(--s6);
-}
-
-.filter-actions {
-  flex-direction: row;
-  gap: var(--s2);
-}
-
-/* --- Checkboxes ---------------------------------------------------------------------------- */
-.check {
-  display: inline-flex;
-  gap: var(--s2);
-  align-items: center;
-  padding: var(--s1) var(--s2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  background: var(--surface);
-  font-size: var(--t-meta);
-  cursor: pointer;
-  transition: border-color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease),
-    transform var(--t-press) var(--ease), box-shadow var(--t-fast) var(--ease);
-}
-
-/* A checkbox is pressed, not clicked, and the difference is a millimetre of travel. */
-.check:active {
-  transform: scale(0.975);
-}
-
-.check:has(input:focus-visible) {
-  box-shadow: var(--focus);
-}
-
-.check:hover {
-  border-color: var(--line-strong);
-  background: var(--surface-2);
-}
-
-.check:has(input:checked) {
-  border-color: var(--accent-line);
-  background: var(--accent-wash);
-}
-
-input[type="checkbox"] {
-  width: 0.875rem;
-  height: 0.875rem;
-  margin: 0;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
-.check-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s2);
-}
-
-/* --- Search builder -------------------------------------------------------------------------- */
-.builder-block {
-  margin-top: var(--s5);
-  padding-top: var(--s5);
-  border-top: 1px solid var(--line);
-}
-
-.crumb-row {
+.listing-tags {
   display: flex;
   flex-wrap: wrap;
   gap: var(--s1);
-  align-items: center;
 }
 
-.crumb {
-  padding: var(--s1) var(--s2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-xs);
-  background: var(--surface-2);
-  color: var(--ink-2);
-  font-size: 0.75rem;
-  cursor: pointer;
-}
-
-.crumb:hover {
-  border-color: var(--line-strong);
-  color: var(--ink);
-}
-
-.cat-node {
-  padding: var(--s2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  background: var(--surface);
-  color: var(--ink-2);
-  font-family: inherit;
-  font-size: 0.8125rem;
-  text-align: left;
-  cursor: pointer;
-}
-
-.cat-node:hover {
-  border-color: var(--accent-line);
-  color: var(--ink);
-}
-
-.chip {
-  display: inline-flex;
-  gap: var(--s2);
-  align-items: center;
-  padding: var(--s1) var(--s2);
-  border: 1px solid var(--accent-line);
-  border-radius: var(--r-sm);
-  background: var(--accent-wash);
-  color: var(--ink);
-  font-size: 0.75rem;
-}
-
-.option-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  max-height: 13rem;
-  overflow-y: auto;
-  padding: var(--s1);
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-}
-
-.option-list .check {
-  border-color: transparent;
-  background: none;
-}
-
-.option-list .check:hover {
-  background: var(--surface);
-}
-
-.option-list .count {
-  margin-left: auto;
-  color: var(--ink-3);
-  font-size: 0.6875rem;
-}
-
-/* The combobox is a control that escapes its own box, so it is positioned against the
-   viewport rather than the field — an absolutely positioned list inside a scrolling
-   ancestor gets clipped. */
-.combo {
-  position: relative;
-}
-
-.combo-list {
-  position: fixed;
-  z-index: var(--z-pop);
-  max-height: 16rem;
-  overflow-y: auto;
-  padding: var(--s1);
-  background: var(--surface);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-sm);
-  box-shadow: var(--elev-3);
-}
-
-.combo-list [role="option"] {
-  display: flex;
-  gap: var(--s2);
-  align-items: center;
-  padding: var(--s2) var(--s3);
-  border-radius: var(--r-xs);
-  font-size: 0.8125rem;
-  cursor: pointer;
-}
-
-.combo-list [role="option"]:hover,
-.combo-list [role="option"][aria-selected="true"] {
+.tag {
+  padding: 0 var(--s2);
   background: var(--surface-3);
+  color: var(--ink-2);
+  border-radius: var(--r-xs);
+  font-size: var(--t-label);
+  white-space: nowrap;
 }
 
-/* --- Flash messages ---------------------------------------------------------------------------- */
-.flash {
+.tag-brand {
+  color: var(--ink-1);
+  font-weight: 600;
+}
+
+.listing-meta {
   display: flex;
-  gap: var(--s3);
-  align-items: flex-start;
-  padding: var(--s3) var(--s4);
-  margin-bottom: var(--s5);
-  border: 1px solid var(--line);
-  border-left-width: 2px;
-  border-radius: var(--r-sm);
-  background: var(--surface);
-  box-shadow: var(--elev-1);
-  font-size: var(--t-body);
+  flex-wrap: wrap;
+  gap: var(--s1) var(--s3);
+  color: var(--ink-3);
+  font-size: var(--t-small);
 }
 
-.flash svg {
-  width: 1rem;
-  height: 1rem;
-  margin-top: 0.125rem;
+.listing-meta a {
+  color: var(--ink-3);
+  text-decoration: none;
 }
 
-.flash-ok {
-  border-left-color: var(--ok);
-  color: var(--ok);
+.listing-meta a:hover {
+  color: var(--accent);
+  text-decoration: underline;
 }
 
-.flash-error {
-  border-left-color: var(--bad);
-  color: var(--bad);
+/* No rule above the foot. There was one, and it sat twelve pixels above the decay
+   bar, so every tile closed on two parallel lines and the eye read the gap as a
+   mistake. The decay bar owns the bottom edge now. */
+.listing-foot {
+  display: flex;
+  gap: var(--s2);
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: var(--s2);
+  color: var(--ink-3);
+  font-size: var(--t-small);
 }
 
-/* --- Attention list -------------------------------------------------------------------------------- */
+.listing-foot .source {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.listing-foot .age {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* --- The decay rule --------------------------------------------------------
+   The signature element, and the one place this product can do something no
+   generic dashboard can: nobody else holds a second-precision "when did we catch
+   this" timestamp, so nobody else can show a find visibly dying.
+
+   Width is the fraction of the window left. Linear on purpose — a linear promise is
+   the only one a user can learn. At zero the rule is gone and the tile reads as
+   what it is: history, not an opportunity.
+   ------------------------------------------------------------------------- */
+
+.decay {
+  position: relative;
+  height: 2px;
+  /* The channel the bar empties along. Nearly invisible is wrong: without a
+     legible full extent the bar looks like it simply ends partway, rather than
+     being most of a window that has run out. */
+  background: color-mix(in srgb, var(--line) 55%, var(--line-strong));
+}
+
+.decay::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--fresh, 0) * 100%);
+  background: var(--accent);
+}
+
+.listing.is-cold .decay::after {
+  background: var(--line-strong);
+}
+
+.listing.is-cold .listing-foot .age {
+  color: var(--ink-3);
+}
+
+/* --- Attention band -------------------------------------------------------- */
+
 .attention {
   display: flex;
   flex-direction: column;
@@ -1530,339 +1033,636 @@ input[type="checkbox"] {
   border-bottom: 0;
 }
 
-.attention-row > svg {
-  width: 1rem;
-  height: 1rem;
-  color: var(--bad);
+.attention-row .body {
+  min-width: 0;
+  flex: 1;
+}
+
+.cell-title {
+  font-weight: 600;
+}
+
+.cell-note {
+  color: var(--ink-3);
+  font-size: var(--t-meta);
+  overflow-wrap: anywhere;
 }
 
 .attention-row .when {
-  margin-left: auto;
+  color: var(--ink-3);
+  font-size: var(--t-small);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* --- Builder (the search assembler) ---------------------------------------- */
+
+.url-row {
+  display: flex;
+  gap: var(--s2);
+  align-items: center;
+}
+
+.url-row input {
+  flex: 1;
+}
+
+.builder-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s4) 0;
+  border-top: 1px solid var(--line);
+}
+
+.crumb-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+  min-height: 1.5rem;
+}
+
+.crumb-row .crumb {
+  padding: 0 var(--s2);
+  background: var(--surface-3);
+  color: var(--ink-2);
+  border-radius: var(--r-xs);
+  font-size: var(--t-small);
+}
+
+.check-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2) var(--s4);
+}
+
+.combo {
+  position: relative;
+  margin-top: var(--s2);
+}
+
+.combo-list {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: var(--z-pop);
+  max-height: 16rem;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  box-shadow: var(--elev-float);
+}
+
+.combo-list [role="option"] {
+  display: block;
+  width: 100%;
+  padding: var(--s2) var(--s3);
+  background: transparent;
+  color: var(--ink-1);
+  border: 0;
+  text-align: left;
+  font-size: var(--t-meta);
+  cursor: pointer;
+}
+
+.combo-list [role="option"]:hover,
+.combo-list [role="option"][aria-selected="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.option-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  min-height: 1.75rem;
+}
+
+/* --- Buttons --------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  gap: var(--s2);
+  align-items: center;
+  justify-content: center;
+  padding: var(--s2) var(--s4);
+  background: var(--surface);
+  color: var(--ink-1);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  font-size: var(--t-meta);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease);
+}
+
+.btn:hover {
+  background: var(--surface-2);
+  border-color: var(--ink-4);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn[disabled],
+.btn[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-ink);
+}
+
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--accent) 88%, var(--ink-1));
+  border-color: transparent;
+}
+
+.btn-quiet {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-2);
+}
+
+.btn-quiet:hover {
+  background: var(--surface-3);
+  border-color: transparent;
+  color: var(--ink-1);
+}
+
+.btn-danger {
+  background: transparent;
+  border-color: transparent;
+  color: var(--bad);
+}
+
+.btn-danger:hover {
+  background: var(--bad-soft);
+  border-color: transparent;
+}
+
+.btn-sm {
+  padding: var(--s1) var(--s3);
+  font-size: var(--t-small);
+}
+
+.btn .spinner {
+  width: 0.85em;
+  height: 0.85em;
+  border: 2px solid currentcolor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 640ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+.inline {
+  display: inline;
+}
+
+/* --- Forms ----------------------------------------------------------------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+  min-width: 0;
+}
+
+.field > label,
+.field-label {
+  color: var(--ink-2);
+  font-size: var(--t-small);
+  font-weight: 600;
+}
+
+.field .hint {
   color: var(--ink-3);
   font-size: var(--t-small);
 }
 
-/* --- Empty states -------------------------------------------------------------------------------------
- * A ruled panel with the reason in it, not an icon floating in a void: an empty screen
- * should teach the interface rather than apologise for being empty. */
+input[type="text"],
+input[type="search"],
+input[type="password"],
+input[type="number"],
+select,
+textarea {
+  width: 100%;
+  padding: var(--s2) var(--s3);
+  background: var(--surface);
+  color: var(--ink-1);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  font-size: var(--t-meta);
+  transition: border-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease);
+}
+
+input::placeholder {
+  color: var(--ink-3);
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--ink-4);
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: var(--accent);
+  outline-offset: 1px;
+}
+
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background: var(--surface-3);
+  color: var(--ink-3);
+  cursor: not-allowed;
+}
+
+select {
+  appearance: none;
+  padding-right: var(--s8);
+  background-image: linear-gradient(45deg, transparent 50%, currentcolor 50%),
+    linear-gradient(135deg, currentcolor 50%, transparent 50%);
+  background-position: right 0.9rem top 55%, right 0.6rem top 55%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.check {
+  display: flex;
+  gap: var(--s2);
+  align-items: flex-start;
+  padding: var(--s1) 0;
+  font-size: var(--t-meta);
+  cursor: pointer;
+}
+
+.check input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0.2rem 0 0;
+  accent-color: var(--accent);
+  flex: none;
+}
+
+.check:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--s4);
+}
+
+.form-grid .span-all {
+  grid-column: 1 / -1;
+}
+
+.form-actions {
+  display: flex;
+  gap: var(--s3);
+  align-items: center;
+  margin-top: var(--s5);
+}
+
+.form-narrow {
+  max-width: 44rem;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  gap: var(--s3);
+  align-items: end;
+  padding: var(--s4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+.filter-actions {
+  display: flex;
+  gap: var(--s2);
+}
+
+/* --- Stepper. The search builder is a sequence, so numbering it is information
+   rather than decoration. That is the one condition under which numbers earn their
+   place, and it is the only place in this interface they appear. ------------- */
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s6);
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.step-head {
+  display: flex;
+  gap: var(--s2);
+  align-items: baseline;
+  color: var(--ink-2);
+  font-size: var(--t-small);
+  font-weight: 600;
+}
+
+.step-head .step {
+  display: grid;
+  place-items: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  background: var(--surface-3);
+  color: var(--ink-2);
+  border-radius: 50%;
+  font-size: var(--t-label);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.builder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.builder-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--s3);
+  align-items: end;
+}
+
+/* --- Tables ---------------------------------------------------------------- */
+
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--t-meta);
+}
+
+/* Every column is as narrow as its content allows; only the running-text column
+   grows. A grid cannot express "one column takes the slack", so the first attempt
+   — sizing the first cell — quietly broke the timestamp-first error table. */
+th,
+td {
+  width: 1%;
+  padding: var(--s3) var(--s4);
+  text-align: left;
+  white-space: nowrap;
+  vertical-align: top;
+}
+
+th.col-grow,
+td.col-grow {
+  width: auto;
+  white-space: normal;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-3);
+  font-size: var(--t-label);
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+tbody tr {
+  border-bottom: 1px solid var(--line);
+}
+
+tbody tr:last-child {
+  border-bottom: 0;
+}
+
+tbody tr:hover {
+  background: var(--surface-2);
+}
+
+td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.row-actions {
+  display: flex;
+  gap: var(--s2);
+  justify-content: flex-end;
+}
+
+.disclosure-row td {
+  padding-top: 0;
+  background: var(--surface-2);
+}
+
+/* --- Pills ----------------------------------------------------------------- */
+
+.pill {
+  display: inline-flex;
+  gap: var(--s1);
+  align-items: center;
+  padding: 1px var(--s2);
+  border-radius: var(--r-pill);
+  font-size: var(--t-label);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.pill.plain {
+  background: var(--surface-3);
+  color: var(--ink-2);
+}
+
+.pill.ok,
+.pill.running,
+.pill.active {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.pill.warn,
+.pill.stale,
+.pill.paused,
+.pill.starting {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.pill.bad,
+.pill.failing,
+.pill.disabled,
+.pill.off {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+/* --- Flashes and alerts ---------------------------------------------------- */
+
+.flash {
+  display: flex;
+  gap: var(--s2);
+  align-items: flex-start;
+  padding: var(--s3) var(--s4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  font-size: var(--t-meta);
+}
+
+.flash-ok {
+  background: var(--ok-soft);
+  border-color: transparent;
+  color: var(--ok);
+}
+
+.flash-error {
+  background: var(--bad-soft);
+  border-color: transparent;
+  color: var(--bad);
+}
+
+/* --- Empty states ----------------------------------------------------------
+   An empty screen is an invitation to act, not an apology. These say what is
+   missing, and what will put something there. ------------------------------- */
+
 .empty {
   display: flex;
   flex-direction: column;
   gap: var(--s2);
   align-items: center;
-  padding: var(--s12) var(--s6);
+  padding: var(--s10) var(--s6);
+  background: var(--surface);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r);
   text-align: center;
 }
 
-.empty svg {
-  width: 1.5rem;
-  height: 1.5rem;
-  margin-bottom: var(--s2);
-  color: var(--ink-3);
+.empty > svg {
+  color: var(--ink-4);
 }
 
 .empty h3 {
   font-size: var(--t-section);
+  font-weight: 620;
 }
 
 .empty p {
-  max-width: 32rem;
+  max-width: 44ch;
   color: var(--ink-3);
-  font-size: var(--t-small);
-  line-height: 1.6;
-}
-
-/* --- Listing cards -------------------------------------------------------------------------------------------
- * Photo leads, then the price, then the facts, then provenance. The card is a link target,
- * so the only motion is a border change.
- *
- * The photo frame is a fixed 4:5 box and the image is taken out of flow inside it. It
- * cannot be left to `height: 100%`: that is a cyclic dependency, and browsers resolve it
- * by ignoring the aspect ratio and falling back to the image's own proportions — which is
- * how a 901x1600 photo ends up 96px taller than its neighbour and leaves a dead hole in
- * every card shorter than the tallest in the row. */
-.listing-grid {
-  display: grid;
-  gap: var(--s4);
-  grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
-}
-
-.listing {
-  display: flex;
-  flex-direction: column;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  box-shadow: var(--elev-1);
-  overflow: hidden;
-  transition: border-color var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease),
-    transform var(--t-base) var(--ease);
-}
-
-/* The one place in the interface where a hover does something structural rather than
-   only recolouring. Two millimetres of lift and a step of elevation is what a card of
-   photographs should do under the pointer — it separates from the grid it sits in, so
-   the row you are reading is the row you are pointing at. Everything animates on
-   transform and box-shadow only; nothing here reflows the grid. */
-.listing:hover {
-  border-color: var(--line-strong);
-  box-shadow: var(--elev-2);
-  transform: translateY(-2px);
-}
-
-.listing:active {
-  transform: translateY(0);
-}
-
-.listing .photo,
-.listing .no-photo {
-  position: relative;
-  display: block;
-  width: 100%;
-  aspect-ratio: 4 / 5;
-  padding: 0;
-  border: 0;
-  background: var(--sunken);
-  cursor: zoom-in;
-}
-
-.listing .photo img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.listing .no-photo {
-  cursor: default;
-}
-
-.listing .photo .count {
-  position: absolute;
-  top: var(--s2);
-  right: var(--s2);
-  display: inline-flex;
-  align-items: center;
-  gap: 0.1875rem;
-  padding: 0 var(--s2);
-  background: rgba(12, 16, 20, 0.72);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: var(--r-pill);
-  font-size: var(--t-label);
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  line-height: 1.375rem;
-}
-
-.listing .photo .count svg {
-  width: 0.75rem;
-  height: 0.75rem;
-}
-
-/* What a photo area shows when there is no picture to show, whether the listing never had
-   one or the CDN refused to serve it. The box is already fixed by the 4:5 frame around
-   it, so swapping the contents moves nothing on the page. */
-.photo-fallback {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s2);
-  align-items: center;
-  justify-content: center;
-  padding: var(--s4);
-  text-align: center;
-  color: var(--ink-3);
-  background: var(--sunken);
-}
-
-.photo-fallback svg {
-  width: 1.25rem;
-  height: 1.25rem;
-  opacity: 0.7;
-}
-
-.photo-fallback-text {
-  max-width: 8rem;
-  font-size: var(--t-label);
-  line-height: 1.35;
-}
-
-/* Held back until the image is known to be dead, so a photo that is merely still arriving
-   does not flash a placeholder on top of it. */
-.photo .photo-fallback {
-  display: none;
-}
-
-.photo.is-broken .photo-fallback {
-  display: flex;
-}
-
-.photo.is-broken img {
-  display: none;
-}
-
-.listing .body {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: var(--s2);
-  padding: var(--s3);
-}
-
-.listing .title {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  min-height: 2.5rem;
-  color: var(--ink);
   font-size: var(--t-meta);
-  font-weight: 500;
-  line-height: 1.4;
-  letter-spacing: var(--track-normal);
-  overflow: hidden;
 }
 
-.listing .title:hover {
-  color: var(--accent);
-  text-decoration: none;
-}
+/* --- Skeletons. Shown while a dropdown's options are in flight, so that "still
+   loading" stops looking identical to "nothing here". ----------------------- */
 
-.listing .price {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s2);
-  align-items: baseline;
-}
-
-/* Price is the answer the card was clicked for, so it is the second loudest thing on it
-   after the photograph, and the only figure set in the display cut. */
-.listing .price strong {
-  font-size: 1.125rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: var(--track-tightest);
-}
-
-.listing .price .total {
-  color: var(--ink-3);
-  font-size: var(--t-small);
-}
-
-.listing .tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s1);
-}
-
-.listing .tag {
-  padding: 0 var(--s2);
-  border: 1px solid var(--line);
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-3) 25%, var(--surface-2) 37%, var(--surface-3) 63%);
+  background-size: 400% 100%;
   border-radius: var(--r-xs);
-  color: var(--ink-2);
-  font-size: var(--t-label);
-  line-height: 1.5rem;
-  white-space: nowrap;
+  animation: shimmer 1.4s ease infinite;
 }
 
-.listing .tag.brand {
-  color: var(--ink);
-  font-weight: 500;
-}
-
-.listing .meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s2);
-  color: var(--ink-3);
-  font-size: var(--t-small);
-}
-
-.listing .meta a {
-  color: var(--ink-3);
-}
-
-.listing .meta a:hover {
-  color: var(--accent);
-}
-
-/* On a touchscreen an 18px line of text is not a target. The seller handle is a
-   secondary link, but it is still one somebody taps, so it gets the height of a
-   finger without changing how it reads. */
-@media (pointer: coarse) {
-  .listing .meta a {
-    display: inline-flex;
-    align-items: center;
-    min-height: 1.5rem;
-    padding-inline: var(--s1);
+@keyframes shimmer {
+  to {
+    background-position: -135% 0;
   }
 }
 
-/* Provenance is pinned to the bottom of every card in the row, which is only possible
-   because the photo frame above it is a fixed ratio. */
-.listing .foot {
-  margin-top: auto;
-  padding-top: var(--s2);
-  border-top: 1px solid var(--line);
-  justify-content: space-between;
-  align-items: center;
+.skeleton-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s4);
 }
 
-.listing .foot .search-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.skeleton-row .bar {
+  height: 0.75rem;
 }
 
-.listing .age {
-  flex: none;
+.is-busy {
+  position: relative;
+  pointer-events: none;
 }
 
-/* --- Charts -------------------------------------------------------------------------------------------
- * Every day in the window is drawn, empty days included. A search that used to find ten a
-   day and now finds none is the exact thing this page exists to make visible. */
+/* --- Charts ---------------------------------------------------------------- */
+
 .chart-group {
-  display: grid;
-  gap: var(--s8);
-  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  display: flex;
+  flex-direction: column;
+  gap: var(--s6);
+  padding: var(--s5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
 }
 
-/* The label carries the scale. A bar chart without a number on it is a picture; the
-   peak is the only figure that turns it back into a reading, and it costs two words. */
+.chart-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
 .chart-head {
   display: flex;
   gap: var(--s3);
   align-items: baseline;
-  margin-bottom: var(--s4);
+  justify-content: space-between;
 }
 
 .chart-label {
-  display: block;
-  color: var(--ink-3);
-  font-size: var(--t-label);
+  font-size: var(--t-meta);
   font-weight: 600;
-  letter-spacing: var(--track-wide);
-  text-transform: uppercase;
 }
 
 .chart-peak {
-  margin-left: auto;
-  color: var(--ink-2);
+  color: var(--ink-3);
   font-size: var(--t-small);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 .chart {
   display: flex;
-  gap: 2px;
+  gap: 3px;
   align-items: flex-end;
   height: 7rem;
-  padding-bottom: var(--s3);
-  /* The baseline is the value axis, so it is drawn at full strength while everything
-     above it stays hairline. Without it the bars float and the chart has no floor. */
+  padding-top: var(--s2);
   border-bottom: 1px solid var(--line-strong);
 }
 
@@ -1870,63 +1670,65 @@ input[type="checkbox"] {
   display: flex;
   flex: 1;
   flex-direction: column;
+  gap: var(--s1);
+  align-items: center;
   justify-content: flex-end;
   height: 100%;
   border-radius: var(--r-xs) var(--r-xs) 0 0;
-  text-align: center;
   transition: background-color var(--t-fast) var(--ease);
 }
 
-/* Pointing at a bar answers with the day under it, without a tooltip and without a
-   layout shift: the column behind it takes a wash, so the value in the title attribute
-   has something to point at. */
 .bar-col:hover {
-  background: var(--surface-2);
+  background: var(--surface-3);
 }
 
 .bar {
+  width: 100%;
   min-height: 2px;
-  background: linear-gradient(
-    180deg,
-    var(--accent) 0%,
-    color-mix(in srgb, var(--accent) 62%, var(--surface)) 100%
-  );
+  background: var(--accent);
   border-radius: var(--r-xs) var(--r-xs) 0 0;
   transform-origin: bottom;
 }
 
+/* An empty day is drawn, not skipped. A chart without its zeros looks tidier and
+   is worse: a search that found ten a day and now finds none is precisely what
+   this page exists to make visible. */
 .bar.zero {
   background: var(--line-strong);
 }
 
 .bar-label {
-  margin-top: var(--s2);
   color: var(--ink-3);
-  font-size: 0.625rem;
+  font-size: var(--t-label);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-/* --- Destinations ------------------------------------------------------------------------------------------- */
-.dest-grid {
-  display: grid;
-  gap: var(--s4);
-  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
-}
+/* --- Destinations ---------------------------------------------------------- */
 
-.dest {
+.dest-list {
   display: flex;
   flex-direction: column;
-  gap: var(--s3);
-  padding: var(--s5);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r);
-  box-shadow: var(--elev-1);
-  transition: box-shadow var(--t-base) var(--ease), border-color var(--t-base) var(--ease);
+  overflow: hidden;
 }
 
-.dest:hover {
-  border-color: var(--line-strong);
-  box-shadow: var(--elev-2);
+.dest {
+  /* A column, not a two-column grid. As a grid the children flowed into cells in
+     document order, which put the chat id in the far right column, a screen away
+     from the name it belongs to. Only the action pair is right-aligned, and that
+     is a margin, not a column. */
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s4) var(--s5);
+  border-bottom: 1px solid var(--line);
+}
+
+.dest:last-child {
+  border-bottom: 0;
 }
 
 .dest.off {
@@ -1939,271 +1741,191 @@ input[type="checkbox"] {
   align-items: center;
 }
 
-.dest-head h3 {
-  font-size: var(--t-body);
-}
-
 .dest-icon {
   display: grid;
   place-items: center;
   width: 2rem;
   height: 2rem;
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  background: var(--surface-2);
+  background: var(--surface-3);
   color: var(--ink-2);
+  border-radius: var(--r);
+  flex: none;
 }
 
-.dest-icon svg {
-  width: 1.125rem;
-  height: 1.125rem;
+.dest h3 {
+  font-size: var(--t-body);
+  font-weight: 620;
 }
 
-.kind-label {
+.dest .kind-label {
   color: var(--ink-3);
   font-size: var(--t-small);
-  text-transform: capitalize;
 }
 
-.dest-head .pill {
-  margin-left: auto;
-}
-
-.target {
-  padding: var(--s2) var(--s3);
-  background: var(--sunken);
-  border-radius: var(--r-xs);
+.dest .target {
+  margin-top: var(--s2);
   color: var(--ink-2);
   font-family: var(--mono);
   font-size: var(--t-small);
-  word-break: break-all;
-}
-
-.reason {
-  color: var(--bad);
-  font-size: var(--t-meta);
+  overflow-wrap: anywhere;
 }
 
 .delivery {
-  display: grid;
-  gap: var(--s3);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin: 0;
-  padding-top: var(--s3);
-  border-top: 1px solid var(--line);
+  display: flex;
+  gap: var(--s6);
+  margin-top: var(--s3);
 }
 
 .delivery dt {
   color: var(--ink-3);
   font-size: var(--t-label);
   font-weight: 600;
-  letter-spacing: var(--track-wide);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .delivery dd {
-  margin: 2px 0 0;
   font-size: var(--t-body);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
-.delivery-bad dd {
-  color: var(--bad);
-}
-
-.delivery-warn dd {
-  color: var(--warn);
-}
-
-.delivery-ok dd {
-  color: var(--ok);
-}
-
-.delivery-note {
-  color: var(--ink-3);
-  font-size: var(--t-meta);
-  line-height: 1.6;
-}
-
 .dest-foot {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--s2);
-  margin-top: auto;
-  padding-top: var(--s3);
-  border-top: 1px solid var(--line);
+  align-items: center;
+  margin-top: var(--s3);
 }
 
-/* --- Pager ------------------------------------------------------------------------------------------------------ */
+.dest .reason,
+.dest .hint {
+  margin: 0;
+}
+
+/* --- Pager ----------------------------------------------------------------- */
+
 .pager {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--s1);
   align-items: center;
-  margin-top: var(--s6);
+  padding-top: var(--s2);
 }
 
 .pager .gap {
   padding: 0 var(--s1);
   color: var(--ink-3);
-  font-variant-numeric: tabular-nums;
 }
 
 .pager .is-current {
   background: var(--accent);
-  border-color: var(--accent);
+  border-color: transparent;
   color: var(--accent-ink);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  font-weight: 600;
 }
 
-/* --- Lightbox --------------------------------------------------------------------------------------------------- */
+/* --- Lightbox -------------------------------------------------------------- */
+
 .lightbox {
   position: fixed;
   inset: 0;
   z-index: var(--z-lightbox);
   display: grid;
   place-items: center;
-  padding: var(--s8);
-  background: rgba(10, 13, 16, 0.92);
-  box-shadow: var(--shadow-scrim);
+  background: rgb(8 11 13 / 0.92);
+}
+
+.lightbox[hidden] {
+  display: none;
 }
 
 .lightbox img {
-  max-width: min(90vw, 60rem);
+  max-width: min(92vw, 60rem);
   max-height: 82vh;
   object-fit: contain;
   border-radius: var(--r);
-  /* The photograph is the subject; it gets the one real shadow in the interface, plus
-     a hairline so a white garment still has an edge against the scrim. */
-  box-shadow: var(--elev-3);
 }
 
-/* Arrives from just inside its final size. Never from scale(0), which reads as coming
-   from nowhere; the photograph itself does not scale, so it cannot distort. */
-@media (prefers-reduced-motion: no-preference) {
-  .lightbox:not(.is-closing) {
-    animation: lb-in var(--t-base) var(--settle) both;
-  }
-
-  .lightbox.is-closing {
-    animation: lb-out 120ms var(--ease) both;
-  }
-}
-
-@keyframes lb-in {
-  from {
-    opacity: 0;
-    transform: scale(0.985);
-  }
-}
-
-@keyframes lb-out {
-  to {
-    opacity: 0;
-  }
-}
-
-.lb-close,
-.lb-prev,
-.lb-next {
+.lb-btn {
   position: absolute;
   display: grid;
   place-items: center;
   width: 2.75rem;
   height: 2.75rem;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: var(--r-pill);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  background: rgb(255 255 255 / 0.1);
   color: #fff;
-  font-size: 1.5rem;
+  border: 1px solid rgb(255 255 255 / 0.16);
+  border-radius: 50%;
+  font-size: 1.25rem;
   line-height: 1;
   cursor: pointer;
-  /* Fixed overlay controls, which is one of the two places a backdrop filter is allowed
-     (the other is the sticky top bar). The hit area stays the same size either way. */
-  backdrop-filter: blur(6px);
-  transition: background-color var(--t-fast) var(--ease), scale var(--t-press) var(--ease);
+  transition: background-color var(--t-fast) var(--ease);
 }
 
-.lb-close:hover,
-.lb-prev:hover,
-.lb-next:hover {
-  background: rgba(255, 255, 255, 0.22);
-}
-
-/* `scale`, not `transform`: the arrow buttons are centred with translateY(-50%), and
-   writing to transform here would drop that offset and throw them 1.4rem down the
-   screen on every press. The individual properties compose instead of overwriting. */
-.lb-close:active,
-.lb-prev:active,
-.lb-next:active {
-  scale: 0.94;
+.lb-btn:hover {
+  background: rgb(255 255 255 / 0.2);
 }
 
 .lb-close {
-  top: var(--s5);
-  right: var(--s5);
+  top: var(--s4);
+  right: var(--s4);
 }
 
 .lb-prev {
-  left: var(--s5);
-  top: 50%;
-  transform: translateY(-50%);
+  left: var(--s4);
+  scale: -1;
 }
 
 .lb-next {
-  right: var(--s5);
-  top: 50%;
-  transform: translateY(-50%);
+  right: var(--s4);
 }
 
 .lb-counter {
   position: absolute;
-  bottom: var(--s5);
-  left: 50%;
-  padding: var(--s1) var(--s3);
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: var(--r-pill);
-  color: #fff;
+  bottom: var(--s4);
+  color: rgb(255 255 255 / 0.7);
   font-size: var(--t-small);
   font-variant-numeric: tabular-nums;
-  backdrop-filter: blur(6px);
-  transform: translateX(-50%);
 }
 
-/* --- Pages without the shell ------------------------------------------------------------------------------------ */
+/* --- Notice pages (login, error) ------------------------------------------- */
+
 .centered-page {
   display: grid;
   place-items: center;
+  min-height: 100vh;
   min-height: 100dvh;
   padding: var(--s6);
 }
 
-/* The login and error pages are the only screens a person sees before they are in, so
-   they get more air and more elevation than anything inside the app: this panel is the
-   first and last impression the product makes. */
 .notice-card {
   display: flex;
   flex-direction: column;
-  gap: var(--s5);
-  width: min(100%, 25rem);
-  padding: var(--s10);
+  gap: var(--s4);
+  width: min(100%, 28rem);
+  padding: var(--s8);
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  box-shadow: var(--elev-2);
+  border-radius: var(--r);
+  box-shadow: var(--elev-float);
 }
 
 .notice-card h1 {
-  font-size: 1.375rem;
-  letter-spacing: var(--track-tightest);
+  font-size: var(--t-title);
+  font-weight: 620;
+  letter-spacing: -0.015em;
 }
 
 .brand-centered {
-  padding: 0;
-  margin-bottom: var(--s2);
-  font-size: 1.0625rem;
+  justify-content: center;
+}
+
+.notice-code {
+  color: var(--ink-3);
+  font-size: var(--t-figure);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 .login-form {
@@ -2211,194 +1933,297 @@ input[type="checkbox"] {
   flex-direction: column;
 }
 
-.notice-code {
+/* --- Shortcut sheet -------------------------------------------------------- */
+
+/* A broken image is not a reason to throw a listing away. The fallback occupies
+   exactly the space the photograph would have, so nothing on the page moves. */
+.is-broken img,
+img.is-broken {
+  display: none;
+}
+
+.listing.is-cursor {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.shortcut-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  padding: var(--s4) var(--s5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+}
+
+.shortcut-sheet .section-head h2 {
+  font-size: var(--t-meta);
+}
+
+.shortcuts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--s2) var(--s5);
+}
+
+.shortcuts div {
+  display: flex;
+  gap: var(--s2);
+  align-items: center;
+  justify-content: space-between;
+  color: var(--ink-2);
+  font-size: var(--t-meta);
+}
+
+kbd {
+  padding: 1px var(--s2);
+  background: var(--surface-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-xs);
+  font-family: var(--font);
+  font-size: var(--t-label);
+  font-weight: 650;
+}
+
+/* --- Theme switch ---------------------------------------------------------- */
+
+.theme-switch {
+  display: flex;
+  gap: 1px;
+  padding: 2px;
+  background: var(--surface-3);
+  border-radius: var(--r);
+}
+
+.theme-option {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.5rem;
+  background: transparent;
   color: var(--ink-3);
-  font-size: 3rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: var(--track-tightest);
-  line-height: 1;
+  border: 0;
+  border-radius: var(--r-xs);
+  cursor: pointer;
+  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
 }
 
-.notice-card .btn {
-  align-self: flex-start;
+.theme-option:hover {
+  color: var(--ink-1);
 }
 
-/* --- Responsive -------------------------------------------------------------------------------------------------
- * Desktop is the design. These two breakpoints make it survive a tablet and a phone
- * without squeezing a desktop layout into a narrower box: the shell becomes a drawer,
- * and the thing being read gets the whole width. */
-@media (max-width: 60rem) {
+.theme-option[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: var(--elev-1);
+}
+
+/* --- Responsive ------------------------------------------------------------
+   Desktop-first. Below the desktop breakpoint the rail becomes a drawer, the
+   triage header stacks into one column, and every table becomes a stacked
+   key/value row — never a horizontal scrollbar, which is the mobile-web tell this
+   application must not have.
+   ------------------------------------------------------------------------- */
+
+@media (width <= 60rem) {
   .app {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: 1fr;
+  }
+
+  .rail {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 15rem;
+    z-index: var(--z-drawer);
+    background: var(--rail);
+    box-shadow: var(--elev-overlay);
+    translate: -100% 0;
+    transition: translate var(--t-slow) var(--settle);
+  }
+
+  .app.drawer-open .rail {
+    translate: 0 0;
   }
 
   .menu-toggle {
-    display: inline-flex;
-  }
-
-  .nav-scrim {
-    position: fixed;
-    inset: 0;
-    z-index: var(--z-scrim);
-    background: var(--shadow-scrim);
-  }
-
-  .sidebar {
-    position: fixed;
-    inset: 0 auto 0 0;
-    z-index: var(--z-drawer);
-    width: var(--sidebar-w);
-    transform: translateX(-100%);
-    transition: transform var(--t-base) var(--settle);
-  }
-
-  .sidebar.open {
-    transform: none;
-    box-shadow: var(--elev-3);
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    background: transparent;
+    color: var(--ink-1);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r);
+    cursor: pointer;
   }
 
   .content {
-    padding: var(--s5) var(--s4) var(--s10);
+    padding: var(--s4);
   }
 
-  .topbar {
+  .header {
     padding: var(--s3) var(--s4);
   }
 
+  .triage {
+    grid-template-columns: 1fr;
+  }
+
+  .triage-rule {
+    height: 1px;
+  }
+
   .filters {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: 1fr 1fr;
   }
 
-  .stat {
-    flex-basis: 10rem;
-  }
-}
-
-@media (max-width: 40rem) {
-  .listing-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--s3);
-  }
-
-  /* Two lines of reserved title height in a 168px card is a hole in the middle of
-     every card, and on a phone the price is what you are scanning for. The cards are
-     grid items, so they still stretch to a common height and the provenance row still
-     pins to the bottom — losing the reservation costs alignment between a row of two,
-     which costs far less than losing the listing itself below the fold. */
-  .listing .title {
-    min-height: 0;
-  }
-
-  .form-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .url-row {
-    flex-direction: column;
-  }
-
-  .delivery {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .row-actions {
-    flex-wrap: wrap;
-  }
-
-  /* Three stacked controls put half a screen of chrome above the first result. The
-     text field still needs the whole width; the select and the button are both
-     comfortable at half. */
-  .filters {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .filters > .field:first-child {
+  .filters .field:first-child {
     grid-column: 1 / -1;
   }
 
-  /* Both of these put a short timestamp on the right of a sentence. Side by side on a
-     390px screen that sentence gets 150px and wraps to four lines while "vor 9 Min."
-     wraps to three of its own. Stacked, each gets the full width and neither wraps. */
-  .statusbar,
+  .listing-grid {
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  }
+}
+
+@media (width <= 45rem) {
+  .triage-zone {
+    padding: var(--s4);
+  }
+
+  .readout {
+    padding: 0 var(--s4);
+  }
+
+  .listing-grid {
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  }
+
+  .filters {
+    grid-template-columns: 1fr;
+  }
+
+  /* Every table becomes a stacked record. The label comes from the header, so the
+     data and its meaning stay together instead of scrolling apart. */
+  .table-wrap {
+    border: 0;
+    border-radius: 0;
+  }
+
+  thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  table,
+  tbody,
+  tr,
+  td {
+    display: block;
+    width: auto;
+  }
+
+  tbody tr {
+    padding: var(--s3) 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  tbody tr:hover {
+    background: transparent;
+  }
+
+  td {
+    display: flex;
+    gap: var(--s3);
+    justify-content: space-between;
+    padding: var(--s1) var(--s4);
+    text-align: right;
+  }
+
+  td::before {
+    content: attr(data-label);
+    color: var(--ink-3);
+    font-size: var(--t-label);
+    font-weight: 650;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    text-align: left;
+    flex: none;
+  }
+
+  td.col-grow {
+    white-space: normal;
+  }
+
+  .row-actions {
+    justify-content: flex-end;
+  }
+
+  .dest {
+    grid-template-columns: 1fr;
+  }
+
+  .dest-foot {
+    flex-direction: row;
+    align-items: center;
+  }
+
   .attention-row {
     flex-wrap: wrap;
   }
 
-  .statusbar .spacer {
-    display: none;
-  }
-
-  .statusbar .nowrap,
   .attention-row .when {
     width: 100%;
-    margin-left: 0;
-  }
-
-  .attention-row .when {
-    /* Aligned under the text, not under the alert glyph. */
     padding-left: 1.75rem;
   }
+
+  .delivery {
+    gap: var(--s5);
+  }
 }
 
-/* --- Preferences the system already understands -------------------------------------------------------------------
- * Both change the material and the motion, not just the animation. */
-/* --- Motion ----------------------------------------------------------------------------
- * Everything below runs once, on load, and answers something. There are no scroll
- * reveals on this page and there never will be: it is a list of figures somebody reads
- * dozens of times a day, and a chart that fades in every time it scrolls past the fold
- * is motion that carries no information. One moment on arrival, one moment on the bars
- * drawing themselves, and then the interface holds still. */
+/* --- Motion ----------------------------------------------------------------
+   One authored moment: the theme cross-fade, which is the only transition in this
+   application that is not reporting a state change the user just caused.
+
+   There is deliberately no page-enter sequence. The animate skill's frequency gate
+   is unambiguous — this rail is read dozens of times a day, and a product that
+   replays its entrance on every navigation is asking to be looked at instead of
+   read.
+   ------------------------------------------------------------------------- */
+
+.theme-changing body,
+.theme-changing .app {
+  opacity: 0.55;
+  transition: opacity var(--t-slow) var(--ease);
+}
 
 @media (prefers-reduced-motion: no-preference) {
-  /* The arrival. Six pixels and a fade, on the whole page, once. Starting from just
-     below its final position means the interface looks like it is being set down on the
-     table rather than switched on. */
-  .main {
-    animation: page-in 380ms var(--settle) both;
+  .lightbox:not([hidden]) .lb-btn,
+  .lightbox:not([hidden]) img {
+    animation: lb-in var(--t-slow) var(--settle) both;
   }
 
-  /* The bars. Growing from the baseline rather than fading in, because a bar chart is
-     the one place where the direction of travel is the meaning: these are counts
-     accumulating on a day, not boxes appearing. */
   .bar {
-    animation: bar-grow 520ms var(--settle) both;
+    animation: bar-grow 300ms var(--settle) both;
   }
 }
 
-@keyframes page-in {
+@keyframes lb-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: scale(0.96);
   }
 }
 
 @keyframes bar-grow {
   from {
-    transform: scaleY(0.02);
+    transform: scaleY(0);
   }
-}
-
-/* Switching theme is the one transition in the interface that is not about a state the
-   person touched a control for — it is the whole ground changing underneath them. Left
-   instantaneous it snaps; left to the global transition below it would drag every hover
-   state along with it. So it gets its own moment, on the html element, applied only for
-   as long as the switch takes. `.theme-changing` is added and removed by the theme code. */
-:root.theme-changing,
-:root.theme-changing body,
-:root.theme-changing .card,
-:root.theme-changing .stat,
-:root.theme-changing .listing,
-:root.theme-changing .dest,
-:root.theme-changing .sidebar,
-:root.theme-changing .topbar,
-:root.theme-changing .btn,
-:root.theme-changing .nav-link,
-:root.theme-changing .pill,
-:root.theme-changing input,
-:root.theme-changing select {
-  transition: background-color 320ms var(--ease), border-color 320ms var(--ease),
-    color 320ms var(--ease), box-shadow 320ms var(--ease) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2408,23 +2233,6 @@ input[type="checkbox"] {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-
-  .btn:active {
-    transform: none;
-  }
-
-  .listing:active {
-    transform: none;
-  }
-}
-
-@media (prefers-reduced-transparency: reduce) {
-  .lightbox,
-  .lb-close,
-  .lb-prev,
-  .lb-next,
-  .lb-counter {
-    backdrop-filter: none;
+    scroll-behavior: auto !important;
   }
 }

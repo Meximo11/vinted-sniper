@@ -29,14 +29,14 @@
   </div>
 
   {% if not destinations %}
-    <div class="card empty">
+    <div class="empty">
       {{ ui.icon("bell") }}
       <h3>Noch kein Empfänger</h3>
       <p>Lege unten einen Empfänger an. Bis dahin werden Artikel weiterhin gefunden und
          gespeichert. Sie haben nur niemanden, zu dem sie gehen können.</p>
     </div>
   {% else %}
-  <div class="dest-grid">
+  <div class="dest-list">
     {% for destination in destinations %}
     {% set stats = delivery.get(destination.id) %}
     <article class="dest {% if not destination.active %}off{% endif %}">
@@ -154,7 +154,7 @@
   <div class="section-head">
     <h2>Empfänger hinzufügen</h2>
   </div>
-  <div class="card card-pad form-narrow">
+  <div class="form-narrow">
     <form method="post" action="/destinations">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <div class="form-grid">
