@@ -21,27 +21,84 @@ landing page, not a SaaS homepage, not a portfolio piece, not a dribbble concept
 
 ## 2. Mandatory design skills
 
-For **any** frontend/UI task — HTML, Jinja templates, CSS, JavaScript, layout, components,
-navigation, forms, cards, interactions, animation, responsive behaviour, visual design,
-accessibility, loading/empty/error states, dialogs, notifications, or frontend architecture —
-the following are **mandatory**:
+**Visual quality is a core requirement of this product.** A UI change here is a
+visual-direction task, not a mechanical one. The tiering below exists to stop you reading
+skills about ground you are not working on — it exists **not** to make the design expertise
+optional.
 
-1. `ui-ux-pro-max` 2. `impeccable` 3. `frontend-design` 4. `design-taste-frontend`
-5. `high-end-visual-design` 6. `hallmark` 7. `superdesign` 8. `web-design-guidelines`
-9. `grill-me` 10. `animate` 11. `improve-animations` 12. `review-animations`
+### Tier 1 — read before ANY frontend change
 
-`apple-design` is **explicitly excluded** and must not be used.
+Seven skills. The first three govern quality and correctness; the four after them are the
+visual direction this product is built on.
 
-**The rules:**
+| Skill | Why it is always on |
+|---|---|
+| `impeccable` | The quality floor, plus `reference/operate.md` and `reference/craft-floor.md`. |
+| `ui-ux-pro-max` | Has a **search tool**. Run it — do not just read the file. `scripts/search.py "<outcome>" --domain ux`. |
+| `web-design-guidelines` | Its rules live at a URL and change. **Fetch them**; do not work from memory. |
+| `frontend-design` | Visual direction: typography, palette, and making choices that are not defaults. |
+| `hallmark` | Anti-slop gates, structural variety, the locked-token rule, the responsive floor. |
+| `design-taste-frontend` | Brief inference, the dials, the banned-list, the pre-flight check. |
+| `high-end-visual-design` | Depth, motion curves, and the explicit list of what reads as cheap. |
 
-- **Read every `SKILL.md` before implementing.** Not the description — the file.
-- **Do not skip a skill because another one appears to overlap.** Extract the relevant
-  principles from each. They overlap on purpose, and the overlap is where the useful part is.
-- **Treat skills as design intelligence and constraints, not as templates.** Do not paste a
-  skill's visual examples into this product.
-- **Resolve contradictions against the actual product**, and record the resolution in §4.
+**Do not demote any of these.** An earlier version of this file put the four design skills in
+a conditional tier, on the reasoning that the mandate had grown expensive to read. That was
+wrong for this project: it made the skills that matter most optional, which is the opposite of
+what the tiering was for. `tests/visual/test_skill_gate.py` enforces all seven.
+
+### Tier 2 — read when the task actually touches that ground
+
+| The task is about… | Then read |
+|---|---|
+| Motion, animation, transitions, timing | `animate`, `review-animations`, `improve-animations` |
+| Exploring alternatives before committing to a direction | `superdesign` (direction only — see §4) |
+| Challenging a direction before you build it | `grill-me` — **the user must type this one** |
+| Reviewing motion in a diff | `review-animations` — **the user must type this one** |
+
+This tier is for **genuinely irrelevant** skills. Skipping `improve-animations` on a copy
+change is right; skipping `hallmark` on a visual redesign is not.
+
+### Excluded
+
+`apple-design` is **explicitly out of scope** and must not be used.
+
+### Invocation is not reading
+
+Codebuff loads skills two ways: the `skill` tool (`skill({ name: "hallmark" })`) and the
+`/skill:name` command. **Reading a `SKILL.md` off disk is not either of those.** A file
+open is not a skill invoked: the tool call is what loads a skill into the working context,
+and the two are separately auditable. Treat a manual read as a degraded substitute and say
+so — never let a log entry imply a `skill` call happened when only a file read did.
+
+Where the `skill` tool is exposed, use it. Where it is not, the file read is the only
+mechanism available, and the correct response is to **state that limitation in the log**,
+not to write `invoked: yes` and hope nobody looks. An agent that cannot invoke a tool must
+not imply it did.
+
+### The rules
+
+- **Read the `SKILL.md`, not just its frontmatter.** Reading the description is how a skill
+  gets claimed without being read.
+- **Do not skip a skill because another appears to overlap.** The overlap is where the
+  useful part usually is.
+- **Treat skills as constraints and intelligence, not templates.** Do not paste a skill's
+  visual examples into this product.
+- **Resolve contradictions against the product**, and record the resolution in §4.
 - **Never claim a skill was used unless its `SKILL.md` was actually read.**
-- **Never claim visual QA was performed unless the rendered UI was actually inspected.**
+- **Never claim a skill was invoked unless it was loaded through the `skill` tool or a
+  `/skill:name` command.** If you only read the file, log `mechanism: file-read` and say the
+  tool was unavailable.
+- **Never claim visual QA unless the rendered UI was actually inspected.**
+- **A passing gate is not a design review.** `tests/visual/test_skill_gate.py` proves the
+  expertise was *consulted and recorded*. It cannot judge whether the resulting interface is
+  any good. Visual quality is established by looking at the rendered app and critiquing it
+  against the brief — a green suite is a floor, never a verdict.
+- **Log the read with what you extracted.** Every frontend change needs an entry in
+  `docs/ui-skill-log.md` naming each Tier 1 skill and, for each, the **rule pulled out of
+  it**, the **decision it changed**, and **where that decision lives in the code** — plus the
+  `invoked:` / `mechanism:` receipt. A bare list of names is not evidence of use and the gate
+  rejects it. Where a skill's advice genuinely does not fit this product, write that down
+  with the reason; an invented connection is worse than an honest rejection.
 
 Where they live:
 
@@ -52,8 +109,7 @@ Where they live:
 | Mirrored for Claude Code | `.claude/skills/<name>` (symlinks, except `impeccable`) |
 
 `grill-me` and `review-animations` carry `disable-model-invocation: true`. You cannot
-self-invoke them; the user must type them. If the user has not, say so rather than
-pretending to have run them.
+self-invoke them. If the user has not typed them, say so rather than implying you ran them.
 
 ---
 
