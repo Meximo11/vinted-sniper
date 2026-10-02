@@ -1,98 +1,167 @@
 {% extends "base.html" %}
 {% import "_icons.html" as ui %}
 
-{% block title %}Aktivität · vinted-sniper{% endblock %}
-{% block heading %}Aktivität{% endblock %}
+{% block title %}Verlauf · vinted-sniper{% endblock %}
+{% block heading %}Verlauf{% endblock %}
 
-{% macro chart(series, label, peak) -%}
-{# Jeder Tag im Zeitraum wird gezeichnet, auch die leeren. Ein Balkendiagramm ohne die
-   Nullen sieht ordentlicher aus und ist schlechter: Eine Suche, die früher zehn am Tag
-   gefunden hat und heute keine, ist genau das, was diese Seite sichtbar machen soll. #}
-<div class="chart" role="img" aria-label="{{ label }}">
-  {% for day, count in series %}
-  <div class="bar-col" title="{{ day }}: {{ count }}">
-    <div class="bar {% if not count %}zero{% endif %}"
-         style="height: {{ (100 * count / peak) | round | int if peak and count else 3 }}%"></div>
-    <span class="bar-label">{{ day[5:] }}</span>
+{# Diese Seite ist ein Verlauf, keine Überwachung. Der Unterschied ist nicht
+   kosmetisch: "wie läuft das System gerade" braucht Zähler, die sich nie
+   zurücksetzen (Blocksperren, Rate-Limits, Abfragen ohne Treffer), und die
+   beantworten "was ist gerade der Zustand". "Was ist passiert" braucht
+   Ereignisse in der Reihenfolge, in der sie passiert sind, mit Zeitpunkt und
+   Ergebnis. Beides auf eine Seite zu legen war der Fehler.
+
+   Ein Diagramm, nicht zwei. Beide Reihen sind Tageszahlen und damit auf
+   derselben Skala vergleichbar — ein Gefundener und eine Zustellung sind
+   dasselbe, eine Zählung. Zwei Diagramme mit eigener Skala daneben wirkten
+   Vergleichbar, waren es aber nicht: ein Tag mit 6.734 Funden und ein Tag mit
+   14.556 Zustellungen sahen gleich hoch aus. Eine gemeinsame Skala beantwortet
+   zusätzlich die einzige Frage, die hier wirklich zählt: kommen die
+   Benachrichtigungen mit dem Funden mit? #}
+{% macro chart(found, sent, peak) -%}
+<div class="chart" role="img"
+     aria-label="Pro Tag: {{ found | length }} Tage, gefunden und zugestellt, gemeinsame Skala 0 bis {{ peak }}">
+  {% for index in range(found | length) %}
+  <div class="bar-col"
+       title="{{ found[index][0] }}: {{ found[index][1] }} gefunden, {{ sent[index][1] }} zugestellt">
+    <div class="bars">
+      <div class="bar{% if not found[index][1] %} zero{% endif %}"
+           style="height: {{ (100 * found[index][1] / peak) | round | int if peak and found[index][1] else 3 }}%"></div>
+      <div class="bar is-sent{% if not sent[index][1] %} zero{% endif %}"
+           style="height: {{ (100 * sent[index][1] / peak) | round | int if peak and sent[index][1] else 3 }}%"></div>
+    </div>
+    <span class="bar-label">{{ found[index][0][5:] }}</span>
   </div>
   {% endfor %}
+</div>
+<div class="chart-foot">
+  <span class="chart-key">
+    <span class="chart-key-mark"></span>Gefunden
+    <span class="chart-key-mark is-sent"></span>Zugestellt
+  </span>
+  <span class="chart-scale">Skala 0–{{ '{:,}'.format(peak) | replace(',', '.') }}, gemeinsam für beide Reihen</span>
 </div>
 {%- endmacro %}
 
 {% block content %}
 
-{# --- Summen, in derselben Sprache wie der Triage-Kopf auf der Übersicht ---------
-     Eine Oberfläche hat eine Art, Zahlen zu zeigen. Fünf Kacheln wären eine zweite
-     gewesen, und eine zweite Art kostet mehr, als sie an Genauigkeit gewinnt. #}
-<section aria-label="Summen">
-  <div class="triage triage-single">
-    <section class="triage-zone" aria-labelledby="aktivitaet-summen">
-      <h2 id="aktivitaet-summen">Summen</h2>
-      <dl class="triage-readouts">
-        <div class="readout">
-          <dt>Gefunden heute</dt>
-          <dd>{{ found_today }}<small> / {{ found_week }} in 7 T.</small></dd>
-        </div>
-        <div class="readout">
-          <dt>Zugestellt</dt>
-          <dd>{{ outbox.sent }}<small> / {{ sent_week }} in 7 T.</small></dd>
-        </div>
-        <div class="readout {% if outbox.failed %}is-bad{% else %}is-quiet{% endif %}">
-          <dt>Fehlgeschlagen</dt>
-          <dd>{{ outbox.failed }}<small> nach 6 Versuchen</small></dd>
-        </div>
-        <div class="readout is-quiet">
-          <dt>Abgelaufen</dt>
-          <dd>{{ outbox.cancelled }}<small> zu alt</small></dd>
-        </div>
-        <div class="readout is-quiet">
-          <dt>Wartend</dt>
-          <dd>{{ outbox.pending + outbox.sending }}<small> in der Schlange</small></dd>
-        </div>
-      </dl>
-    </section>
+<section aria-label="Summen des Zeitraums">
+  <div class="receipt">
+    <div class="receipt-item">
+      <span class="n">{{ found_today }}</span>
+      <span class="k">heute gefunden</span>
+    </div>
+    <div class="receipt-item is-quiet">
+      <span class="n">{{ found_week }}</span>
+      <span class="k">in 7 Tagen gefunden</span>
+    </div>
+    <div class="receipt-item is-quiet">
+      <span class="n">{{ outbox.sent }}</span>
+      <span class="k">zugestellt</span>
+    </div>
+    {% if outbox.failed %}
+    <div class="receipt-item is-bad">
+      <span class="n">{{ outbox.failed }}</span>
+      <span class="k">nach 6 Versuchen gescheitert</span>
+    </div>
+    {% endif %}
+    {% if outbox.cancelled %}
+    <div class="receipt-item is-quiet">
+      <span class="n">{{ outbox.cancelled }}</span>
+      <span class="k">zu alt geworden</span>
+    </div>
+    {% endif %}
   </div>
 </section>
 
-<section aria-label="Aktivität im Zeitverlauf">
+{# Das ist die Seite. Alles darunter ist Zusatz. #}
+<section class="section" aria-label="Was passiert ist">
+  <div class="section-head">
+    <h2>Zuletzt passiert</h2>
+    <div class="spacer"></div>
+    <span class="muted">Neuestes zuerst, letzte 30 Tage</span>
+  </div>
+  {% if not events %}
+    <div class="empty">
+      {{ ui.icon("clock") }}
+      <h3>Noch nichts passiert</h3>
+      <p>Sobald eine Suche etwas findet oder eine Benachrichtigung zugestellt wird, steht
+         es hier — in der Reihenfolge, in der es passiert ist.</p>
+      <a class="btn btn-primary" href="/searches#neu">{{ ui.icon("plus") }}<span>Suche anlegen</span></a>
+    </div>
+  {% else %}
+    <ol class="events">
+      {% for event in events %}
+      <li class="event is-{{ event.kind }}">
+        <span class="event-mark" aria-hidden="true">
+          {%- if event.kind == 'gefunden' -%}{{ ui.icon("box") }}
+          {%- elif event.kind == 'zugestellt' -%}{{ ui.icon("send") }}
+          {%- else -%}{{ ui.icon("alert") }}{%- endif -%}
+        </span>
+        <div class="event-body">
+          <div class="event-head">
+            {% if event.count > 1 %}<span class="event-count">{{ event.count }}×</span>{% endif %}
+            <span class="event-outcome">
+              {%- if event.kind == 'gefunden' -%}gefunden
+              {%- elif event.kind == 'zugestellt' -%}zugestellt
+              {%- else -%}{{ event.status }}{%- endif -%}
+            </span>
+            {% if event.href %}
+            <a class="event-what" href="{{ event.href }}" target="_blank" rel="noreferrer">{{ event.headline }}</a>
+            {% else %}
+            <span class="event-what">{{ event.headline }}</span>
+            {% endif %}
+            {% if event.money %}<span class="event-money">{{ event.money }}</span>{% endif %}
+          </div>
+          {% if event.sub %}<p class="event-sub">{{ event.sub }}</p>{% endif %}
+          <p class="event-meta">
+            <span>{{ event.when }}</span>
+            {% if event.query_name %}
+            <span class="event-dot" aria-hidden="true">·</span>
+            <span>{{ event.query_name }}</span>
+            {% endif %}
+            {% if event.retries %}
+            <span class="event-dot" aria-hidden="true">·</span>
+            <span>{{ event.attempts }} Versuche</span>
+            {% endif %}
+          </p>
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+  {% endif %}
+</section>
+
+<section class="section" aria-label="Verlauf der letzten 14 Tage">
   <div class="section-head">
     <h2>Letzte 14 Tage</h2>
+    <div class="spacer"></div>
+    <span class="muted">
+      Höchstwert {{ '{:,}'.format([listings_series | map(attribute=1) | max,
+                                   sent_series | map(attribute=1) | max] | max) | replace(',', '.') }} an einem Tag
+    </span>
   </div>
-  <div class="chart-group">
-    <div>
-      <div class="chart-head">
-        <span class="chart-label">Gefundene Artikel</span>
-        <span class="chart-peak">Höchstwert {{ '{:,}'.format(listings_series | map(attribute=1) | max) | replace(',', '.') }} an einem Tag</span>
-      </div>
-      {{ chart(listings_series, "Gefundene Artikel pro Tag in den letzten 14 Tagen",
-                listings_series | map(attribute=1) | max) }}
-    </div>
-    <div>
-      <div class="chart-head">
-        <span class="chart-label">Zugestellte Benachrichtigungen</span>
-        <span class="chart-peak">Höchstwert {{ '{:,}'.format(sent_series | map(attribute=1) | max) | replace(',', '.') }} an einem Tag</span>
-      </div>
-      {{ chart(sent_series, "Zugestellte Benachrichtigungen pro Tag in den letzten 14 Tagen",
-                sent_series | map(attribute=1) | max) }}
-    </div>
-  </div>
+  {{ chart(listings_series, sent_series,
+          [listings_series | map(attribute=1) | max, sent_series | map(attribute=1) | max] | max) }}
 </section>
 
-<section aria-label="Zustand je Suche">
+<section class="section" aria-label="Je Suche">
   <div class="section-head"><h2>Je Suche</h2></div>
   {% if not snapshot.searches %}
     <div class="empty">
       {{ ui.icon("search") }}
-      <h3>Es wird nichts beobachtet</h3>
-      <p>Sobald eine Suche läuft, stehen hier ihre Summen und ihr Zustand.</p>
+      <h3>Noch keine Suche</h3>
+      <p>Hier steht später, wie viel jede einzelne Suche gefunden hat und wann sie
+         zuletzt etwas gesehen hat.</p>
+      <a class="btn btn-primary" href="/searches#neu">{{ ui.icon("plus") }}<span>Suche anlegen</span></a>
     </div>
   {% else %}
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
-          <th class="col-grow">Suche</th><th>Status</th><th>Gesehen</th><th>Blocksperren</th>
-          <th>Rate-Limits</th><th>Ohne Treffer</th><th>Letzter Erfolg</th>
+          <th class="col-grow">Suche</th><th>Status</th><th class="num">Insgesamt gefunden</th>
+          <th>Zuletzt erfolgreich</th><th>Zuletzt etwas gefunden</th>
         </tr>
       </thead>
       <tbody>
@@ -104,20 +173,18 @@
             <div class="cell-note">vinted.{{ search.tld }}</div>
           </td>
           <td data-label="Status"><span class="pill {{ search.state }}">{{ search.state_label or search.state }}</span></td>
-          <td class="num muted" data-label="Gesehen">{{ search.items_total }}</td>
-          <td class="num muted" data-label="Blocksperren">{{ search.blocks }}</td>
-          <td class="num muted" data-label="Rate-Limits">{{ search.rate_limits }}</td>
-          <td class="num muted" data-label="Ohne Treffer">{{ search.checks_without_new_listings }}</td>
-          <td class="muted nowrap" data-label="Letzter Erfolg">
+          <td class="num muted" data-label="Insgesamt gefunden">{{ search.items_total }}</td>
+          <td class="muted nowrap" data-label="Zuletzt erfolgreich">
             {% if search.last_success_at %}{{ _age(search.last_success_at, now) }}{% else %}nie{% endif %}
+          </td>
+          <td class="muted nowrap" data-label="Zuletzt etwas gefunden">
+            {% if search.newest_listing_at %}{{ _age(search.newest_listing_at, now) }}{% else %}noch keiner{% endif %}
           </td>
         </tr>
         {% if detail and detail.last_error %}
         <tr>
-          <td colspan="7" class="disclosure-row">
-            <div class="cell-note">
-              {{ detail.last_status }}: {{ detail.last_error }}
-            </div>
+          <td colspan="5" class="disclosure-row">
+            <div class="cell-note">{{ detail.last_status }}: {{ detail.last_error }}</div>
           </td>
         </tr>
         {% endif %}
@@ -128,34 +195,4 @@
   {% endif %}
 </section>
 
-<section aria-label="Letzte Fehler">
-  <div class="section-head"><h2>Letzte Fehler</h2></div>
-  {% if not recent_failures %}
-    <div class="empty">
-      {{ ui.icon("check") }}
-      <h3>Keine Fehler erfasst</h3>
-      <p>Jede Abfrage seit dem Anlegen dieser Datenbank war entweder erfolgreich oder hat
-         keinen Fehler hinterlassen.</p>
-    </div>
-  {% else %}
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Wann</th><th>Suche</th><th class="col-grow">Was passiert ist</th></tr></thead>
-      <tbody>
-        {% for failure in recent_failures %}
-        <tr>
-          <td class="muted nowrap" data-label="Wann">{{ _age(failure.last_polled_at, now) }}</td>
-          <td class="cell-title" data-label="Suche">{{ failure.query_name }}</td>
-          <td class="col-grow" data-label="Was passiert ist">
-            <span class="pill failing plain">{{ failure.last_status }}</span>
-            <span class="cell-note">{{ failure.last_error }}</span>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% endif %}
-</section>
-
-{% endblock %}
+{% endblock %}

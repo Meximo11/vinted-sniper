@@ -485,10 +485,9 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
                 snapshot=snapshot,
                 outbox=outbox,
                 states=states,
-                recent_failures=await repo.recent_failures(),
+                events=_event_views(await repo.recent_events(), now),
                 found_today=await repo.items_since(now - 86_400),
                 found_week=await repo.items_since(now - 7 * 86_400),
-                sent_week=sum(count for _, count in await repo.notifications_per_day(7)),
                 listings_series=await repo.listings_per_day(),
                 sent_series=await repo.notifications_per_day(),
             ),
@@ -503,6 +502,7 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
 
     @app.post("/searches")
     async def add_search(
+        request: Request,
         url: Annotated[str, Form()],
         name: Annotated[str, Form()] = "",
         interval: Annotated[int, Form()] = 0,
@@ -512,14 +512,28 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
         _: None = guard,
         __: None = csrf,
     ) -> Response:
+        # One endpoint, two answers. A plain form post wants the 303 and the
+        # flash; the fetch behind `data-report-done` wants the outcome as data so
+        # the button it was pressed on can finish its own sentence. Both are
+        # answered from the code below, so the number the button shows is the
+        # same number the page would have shown.
+        wants_json = "application/json" in request.headers.get("accept", "")
+
         try:
             normalised = urls.normalise_search_url(url)
             tld = urls.extract_tld(normalised)
             params = urls.parse_search_params(normalised)
         except urls.InvalidSearchURLError as exc:
+            if wants_json:
+                return JSONResponse({"ok": False, "error": str(exc)}, status_code=422)
             return _redirect_with_error(str(exc), "/searches")
 
         if await repo.find_query_by_url(normalised) is not None:
+            if wants_json:
+                return JSONResponse(
+                    {"ok": False, "error": "diese Suche wird bereits beobachtet"},
+                    status_code=409,
+                )
             return _redirect_with_error("diese Suche wird bereits beobachtet", "/searches")
 
         query_id = await repo.add_query(
@@ -533,9 +547,22 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
         )
         for destination_id in destination_ids or []:
             await repo.route(query_id, destination_id)
-        return _redirect_with_ok(
-            f"„{name.strip() or _name_from(params, tld)}“ wird jetzt beobachtet."
-        )
+
+        label = name.strip() or _name_from(params, tld)
+        if wants_json:
+            # Read, never invented. A search created a moment ago has not been
+            # polled yet, so `found` is honestly 0 and the button says "wird
+            # beobachtet" for exactly that case. The one thing this must not do
+            # is put a number on the button that the database did not produce.
+            return JSONResponse(
+                {
+                    "ok": True,
+                    "name": label,
+                    "query_id": query_id,
+                    "found": await repo.listing_count(query_id=query_id),
+                }
+            )
+        return _redirect_with_ok(f"„{label}“ wird jetzt beobachtet.")
 
     @app.post("/searches/{query_id}/edit")
     async def edit_search(
@@ -870,6 +897,61 @@ def _listing_views(rows: list[Any], now: int) -> list[dict[str, Any]]:
                 "freshness": _freshness(row["first_seen_at"], now),
             }
         )
+    return views
+
+
+def _event_views(rows: list[Any], now: int) -> list[dict[str, Any]]:
+    """One row of the timeline as the page wants to say it.
+
+    Same reasoning as `_listing_views`: the SQL picks the events, this decides what
+    each one is called and how its numbers are written, and the template only
+    places them. The outcome is a word rather than a colour, because "failed" and
+    "delivered" have to survive greyscale and a screen reader alike.
+
+    Runs of the same thing are collapsed, and that is not tidiness. One find
+    produces one delivery per destination, so a busy hour is mostly "zugestellt"
+    rows; listed one by one they bury the finds, which are the only events here a
+    person actually came for. Forty identical lines is not a history, it is a
+    scroll. The count is still the true number of rows it stands for.
+    """
+    views: list[dict[str, Any]] = []
+    for row in rows:
+        kind = row["kind"]
+        price = row["price"]
+        headline = row["headline"] or ""
+
+        previous = views[-1] if views else None
+        # Same thing, same subject, inside the same minute: one line, not several.
+        if (
+            previous is not None
+            and previous["kind"] == kind
+            and previous["headline"] == headline
+            and abs(int(row["ts"]) - previous["_ts"]) < 60
+        ):
+            previous["count"] += 1
+            # The newest member of a run carries the freshest moment.
+            previous["when"] = _age(row["ts"], now)
+            continue
+
+        views.append(
+            {
+                "_ts": int(row["ts"]),
+                "kind": kind,
+                "when": _age(row["ts"], now),
+                "query_name": row["query_name"] or "",
+                "headline": headline,
+                "sub": row["sub"] or "",
+                "money": _money(price, row["currency"] or "") if price is not None else "",
+                "href": row["href"] or "",
+                # Only worth saying when it cost something to get there.
+                "retries": (row["attempts"] or 0) > 1,
+                "attempts": row["attempts"] or 0,
+                "status": row["status"] or "",
+                "count": 1,
+            }
+        )
+    for view in views:
+        del view["_ts"]
     return views
 
 

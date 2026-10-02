@@ -4,23 +4,27 @@
 {% block title %}Suchen · vinted-sniper{% endblock %}
 {% block heading %}Suchen{% endblock %}
 
+{% block actions %}
+<a class="btn btn-primary" href="#neu">{{ ui.icon("plus") }}<span>Neue Suche</span></a>
+{% endblock %}
+
 {% block content %}
 
 <section aria-label="Gespeicherte Suchen">
   <div class="section-head">
-    <h2>{{ search_counts.total }} gespeichert</h2>
+    <h2>{{ search_counts.total }} {{ 'Suche' if search_counts.total == 1 else 'Suchen' }}</h2>
     <div class="spacer"></div>
-    <span class="muted">
-      {{ search_counts.active }} aktiv, {{ search_counts.paused }} pausiert
-    </span>
+    <span class="muted">{{ search_counts.active }} laufen · {{ search_counts.paused }} pausiert</span>
   </div>
 
   {% if not snapshot.searches %}
     <div class="empty">
       {{ ui.icon("search") }}
-      <h3>Noch keine Suchen</h3>
-      <p>Stelle die gewünschte Suche auf Vinted zusammen und kopiere dann die Adressezeile
-         in das Feld unten. Oder nutze den Aufbauassistenten und lass die URL ganz weg.</p>
+      <h3>Noch keine Suche</h3>
+      <p>Der einfachste Weg: richte die Suche auf Vinted ein, kopiere die Adressezeile
+         unten rein, und sie läuft los. Willst du nichts tippen, stell sie mit dem
+         Assistenten zusammen.</p>
+      <a class="btn btn-primary" href="#neu">{{ ui.icon("plus") }}<span>Jetzt anlegen</span></a>
     </div>
   {% else %}
   <div class="table-wrap">
@@ -66,7 +70,7 @@
               <form method="post" action="/searches/{{ search.query_id }}/pause" class="inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="paused" value="{{ '0' if search.paused else '1' }}">
-                <button class="btn btn-quiet btn-sm" type="submit">
+                <button class="btn btn-quiet btn-sm" type="submit" data-busy-label="Einen Moment…">
                   {% if search.paused %}{{ ui.icon("play") }}<span>Fortsetzen</span>
                   {% else %}{{ ui.icon("pause") }}<span>Anhalten</span>{% endif %}
                 </button>
@@ -138,7 +142,8 @@
                 </p>
 
                 <div class="form-actions">
-                  <button type="submit" class="btn btn-primary btn-sm">Änderungen speichern</button>
+                  <button type="submit" class="btn btn-primary btn-sm"
+                          data-busy-label="Wird gespeichert…">Änderungen speichern</button>
                 </div>
               </form>
             </div>
@@ -157,7 +162,7 @@
   {% endif %}
 </section>
 
-<section id="neu" aria-label="Neue Suche">
+<section class="section" id="neu" aria-label="Neue Suche">
   <div class="section-head">
     <h2>Neue Suche</h2>
   </div>

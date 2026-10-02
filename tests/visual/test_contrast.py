@@ -9,9 +9,16 @@ right and measures 3.8:1.
 What is asserted:
 
 * every text tier clears 4.5:1 on every surface it is allowed to sit on, in both
-  themes, for the ordinary and small-text thresholds;
-* the accent clears text contrast as a link colour;
+  themes;
+* each status colour clears 4.5:1 on its own tinted wash;
+* --live is graphic-only and never carries a word, and links are ink;
 * --ink-4 is never used as a text colour anywhere in the sheet.
+
+The `--live` rule replaced an older one that required the accent to clear text
+contrast, because that accent no longer exists: the redesign made the chrome
+monochrome and reserved the one warm hue for "this find is still alive". A hue
+that means one thing cannot also be the link colour, and the check now encodes
+the decision that made the sheet coherent.
 """
 
 from __future__ import annotations
@@ -80,33 +87,64 @@ def test_text_tiers_clear_wcag_aa(
     )
 
 
+def test_live_is_graphic_only_and_never_carries_a_word() -> None:
+    """The one warm hue in the sheet means "still alive". It is not a link colour.
+
+    `--live` sits at 1.6:1 on white, so putting a word on it would be unreadable
+    in the light theme no matter how it is used. What the sheet must guarantee is
+    narrower and more useful: the hue never appears as a text colour, and where
+    "live" has to be readable the darker `--live-deep` does the work instead.
+    """
+    sheet = CSS.read_text(encoding="utf-8")
+    offenders = [
+        f"line {index + 1}: {line.strip()}"
+        for index, line in enumerate(sheet.splitlines())
+        if re.match(r"^\s*color:\s*var\(--live\)", line)
+    ]
+    assert not offenders, (
+        "--live is a graphic token: it fills the fresh chip, tints an edge and "
+        "lights the arrival sweep. Use --live-deep for anything with words on it. "
+        "Offenders:\n" + "\n".join(offenders)
+    )
+
+
 @pytest.mark.parametrize("theme", ["light", "dark"])
 @pytest.mark.parametrize("surface", _SURFACES)
-def test_accent_carries_link_text(
+def test_links_are_ink_not_a_hue(
     palettes: dict[str, dict[str, str]], theme: str, surface: str
 ) -> None:
-    """A link colour is text. It gets the same bar as any other text."""
+    """A link is text, so it gets the text bar — and it gets --ink-1's colour.
+
+    The chrome is monochrome on purpose: on a page full of product photography the
+    only saturated colour should be the clothes and the one live signal. A coloured
+    link would put a third meaning on a hue that already means one thing.
+    """
     palette = palettes[theme]
-    ratio = _ratio(palette["accent"], palette[surface])
-    assert ratio >= _MINIMUM, f"{theme}: --accent on --{surface} is {ratio:.2f}:1"
+    ratio = _ratio(palette["ink-1"], palette[surface])
+    assert ratio >= _MINIMUM, f"{theme}: --ink-1 on --{surface} is {ratio:.2f}:1"
+
+
+# Each status colour sits on its own tinted plane. The wash is not always the tone
+# name plus a suffix, so the pairing is explicit rather than derived.
+_STATUS_ON_ITS_WASH = (("good", "good-wash"), ("live-deep", "live-wash"), ("bad", "bad-wash"))
 
 
 @pytest.mark.parametrize("theme", ["light", "dark"])
-@pytest.mark.parametrize("tone", ("ok", "warn", "bad"))
+@pytest.mark.parametrize(("tone", "wash"), _STATUS_ON_ITS_WASH)
 def test_semantic_text_on_its_own_soft_background(
-    palettes: dict[str, dict[str, str]], theme: str, tone: str
+    palettes: dict[str, dict[str, str]], theme: str, tone: str, wash: str
 ) -> None:
-    """A status colour sits on its own tinted pill, not on the page."""
+    """A status colour sits on its own tinted plane, not on the page."""
     palette = palettes[theme]
-    ratio = _ratio(palette[tone], palette[f"{tone}-soft"])
-    assert ratio >= _MINIMUM, f"{theme}: --{tone} on --{tone}-soft is {ratio:.2f}:1"
+    ratio = _ratio(palette[tone], palette[wash])
+    assert ratio >= _MINIMUM, f"{theme}: --{tone} on --{wash} is {ratio:.2f}:1"
 
 
 # The one place --ink-4 is allowed to colour something: the empty-state glyph. It
 # carries nothing the heading has not already said, and WCAG exempts decoration.
 # Naming it here means the exemption is a decision on the record rather than a gap
 # in a search — a second one would fail this.
-_INK_FOUR_EXEMPT = frozenset({".empty > svg"})
+_INK_FOUR_EXEMPT = frozenset({".empty > .ico"})
 
 
 def test_ink_four_is_never_used_as_text() -> None:
@@ -132,7 +170,7 @@ def test_ink_four_is_never_used_as_text() -> None:
         # Walk back to the selector that owns this declaration, so the exemption is
         # checked against the rule rather than against a line number that moves.
         selector = ""
-        for back in range(index - 1, max(index - 6, -1), -1):
+        for back in range(index - 1, max(index - 8, -1), -1):
             if lines[back].rstrip().endswith("{"):
                 selector = lines[back].rstrip()[:-1].strip()
                 break

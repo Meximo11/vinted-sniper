@@ -1,34 +1,127 @@
-/* Dashboard behaviour: the photo lightbox, the mobile nav, a guard on the actions
- * that cannot be undone, and the inline editor panels.
+/* Behaviour for the app: the photo lightbox, the navigation drawer, the theme
+ * switch, a guard on the actions that cannot be undone, the inline editor
+ * panels, and the states a button shows while it works.
  *
- * Everything here is progressive: the page is fully usable with JavaScript off,
- * because the server renders the listings and the forms post normally.
+ * Everything here is progressive. The page is fully usable with JavaScript off,
+ * because the server renders the finds and the forms post normally.
  */
 (() => {
   "use strict";
 
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // --- Photos that never arrive --------------------------------------------------
-  // A Vinted CDN image can 403 at any time, and a listing is not worth throwing away
-  // over one. The card frame is a fixed 4/5 box, so the placeholder that replaces a
-  // dead image takes exactly the space the image would have, and nothing on the page
-  // moves. error does not bubble, but it does pass through the capture phase, so one
-  // listener on the document covers every photo, including any added later.
+  // --- Buttons that tell you what they are doing -------------------------------
+  // "▶ Suche starten" → "◌ läuft…" → the page comes back with the result. The state
+  // lives on the button you pressed rather than in a toast that appears somewhere
+  // else, because the interface responding to *me* is the whole point. The label
+  // is read out of data-busy-label so the copy stays in the template.
+  for (const button of document.querySelectorAll("button[type=submit]")) {
+    const form = button.closest("form");
+    if (!form) continue;
+    form.addEventListener(
+      "submit",
+      () => {
+        if (button.dataset.busy === "off") return;
+        // A client-side `confirm` may still cancel this. Check on the next frame,
+        // by which point the handler has run and the dialog is closed.
+        requestAnimationFrame(() => {
+          if (form.dataset.confirm && !window.confirmShown) return;
+          // A form that reports its own completion can finish before this frame
+          // ever runs — the endpoint is local, so the response is often faster
+          // than the next repaint. Without this the spinner would land on top of
+          // a result the user is already looking at, and the button would sit on
+          // "lädt…" forever.
+          if (button.dataset.state) return;
+          button.dataset.state = "loading";
+          button.setAttribute("aria-busy", "true");
+          const label = button.querySelector("span");
+          if (label && button.dataset.busyLabel) {
+            button.dataset.idleLabel = label.textContent;
+            label.textContent = button.dataset.busyLabel;
+          }
+        });
+      },
+      true,
+    );
+  }
+
+  // --- Forms that finish their own sentence -------------------------------------
+  // Starting a search is the one action here the user is actually waiting on, and
+  // a redirect throws the answer away: the page reloads and the button that was
+  // pressed no longer exists. Forms marked `data-report-done` are posted with
+  // fetch instead and end on the button — "Suche starten" → "Wird angelegt…" →
+  // "✓ 12 neue Treffer". Every other form on the site still posts and redirects.
+  //
+  // The wording comes from the response. A count written here would be a number
+  // the server never agreed to, and this button exists precisely because the
+  // answer is worth having.
+  for (const form of document.querySelectorAll("form[data-report-done]")) {
+    const button = form.querySelector('button[type="submit"]');
+    if (!button) continue;
+    const label = button.querySelector("span");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      let data;
+      try {
+        const response = await fetch(form.action, {
+          method: "POST",
+          body: new FormData(form),
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok) throw new Error(String(response.status));
+        data = await response.json();
+        if (!data.ok) throw new Error("rejected");
+      } catch {
+        // A network drop, a 409, a 422 — anything unexpected goes back through
+        // the plain form post, which renders the server's own sentence in the
+        // flash at the top of the page. One failure path is better than a
+        // second, worse one written just for the fetch.
+        form.submit();
+        return;
+      }
+
+      // A search created a moment ago has not been polled yet, so `found` is
+      // honestly 0. Saying "wird beobachtet" is the true outcome; saying "0 neue
+      // Treffer" would read as a failure, and inventing "23" would be a lie.
+      const done = data.found > 0 ? `${data.found} neue Treffer` : "Wird beobachtet";
+      button.dataset.state = "done";
+      button.setAttribute("aria-busy", "false");
+      if (label) label.textContent = done;
+
+      const status = form.querySelector("[data-run-status]");
+      if (status) status.textContent = `${data.name}: ${done}.`;
+
+      // The button has said its piece; now the page has to agree with it. The
+      // table of saved searches is server-rendered, and a list that still shows
+      // two searches directly under a button that just created a third reads as
+      // a failure. So the result stays up long enough to be read, and then the
+      // ordinary reload happens — which also brings back the flash at the top.
+      window.setTimeout(() => window.location.reload(), 1400);
+    });
+  }
+
+  // --- Photos that never arrive -------------------------------------------------
+  // A Vinted CDN image can 403 at any time, and a find is not worth throwing away
+  // over one. The media box has a fixed 4/5 ratio, so the placeholder that replaces
+  // a dead image takes exactly the space the image would have and nothing on the
+  // page moves. `error` does not bubble but does pass through the capture phase,
+  // so one listener on the document covers every photo, including later ones.
   document.addEventListener(
     "error",
     (event) => {
       const image = event.target;
       if (!(image instanceof HTMLImageElement)) return;
-      image.closest(".listing-photo, .lightbox")?.classList.add("is-broken");
+      image.closest(".tile-media, .lightbox")?.classList.add("is-broken");
     },
     true,
   );
 
-  // --- Photo lightbox -------------------------------------------------------------
-  // Occasional action, so it gets a real entrance: the overlay fades and settles
-  // from just inside its final size. Never from scale(0), which looks like it came
-  // from nowhere. The photograph itself does not scale, so it never distorts.
+  // --- Photo lightbox ------------------------------------------------------------
+  // An occasional action, so it gets a real entrance: the overlay fades in from
+  // just inside its final size, never from scale(0), which looks like it arrived
+  // from nowhere. The photograph itself never scales, so it cannot distort.
 
   const box = document.getElementById("lightbox");
   if (box) {
@@ -44,7 +137,7 @@
 
     function show(i) {
       index = (i + photos.length) % photos.length;
-      // Clear the previous photo's broken state first. If this one is dead too the
+      // Clear the previous photo's broken state first; if this one is dead too the
       // error listener puts it straight back.
       box.classList.remove("is-broken");
       img.src = photos[index];
@@ -59,7 +152,6 @@
       opener = button;
       box.hidden = false;
       box.classList.remove("is-closing");
-      // The page must not scroll underneath the overlay.
       document.body.style.overflow = "hidden";
       show(0);
       closeBtn.focus();
@@ -69,15 +161,14 @@
       if (closing) return;
       const finish = () => {
         box.hidden = true;
-        box.classList.remove("is-closing");
-        box.classList.remove("is-broken");
+        box.classList.remove("is-closing", "is-broken");
         img.removeAttribute("src");
         document.body.style.overflow = "";
         closing = null;
         if (opener) opener.focus();
       };
-      // Exits faster than it enters: opening is the thing you asked for, closing is
-      // the system getting out of the way. Under reduced motion, skip straight out.
+      // Exits faster than it enters: opening is what you asked for, closing is the
+      // system getting out of the way. Under reduced motion, leave immediately.
       if (reduced) {
         finish();
         return;
@@ -91,7 +182,7 @@
       box.addEventListener("animationend", done, { once: true });
     }
 
-    for (const button of document.querySelectorAll(".listing .listing-photo")) {
+    for (const button of document.querySelectorAll(".tile .tile-media")) {
       button.addEventListener("click", () => {
         let list = [];
         try {
@@ -117,21 +208,20 @@
     });
   }
 
-  // --- Mobile navigation ---------------------------------------------------------
-  // A drawer the user opened on purpose: 180ms out-ease, and it slides from the edge
-  // it lives on, so where it came from is obvious.
+  // --- Navigation drawer --------------------------------------------------------
+  // A drawer the user opened on purpose, sliding in from the edge it lives on.
 
   const menu = document.getElementById("menu-toggle");
   const app = document.getElementById("app");
   const scrim = document.getElementById("nav-scrim");
   if (menu && app) {
     const setOpen = (open) => {
-      app.classList.toggle("drawer-open", open);
+      app.classList.toggle("is-nav-open", open);
       menu.setAttribute("aria-expanded", String(open));
       if (scrim) scrim.hidden = !open;
       document.body.style.overflow = open ? "hidden" : "";
     };
-    menu.addEventListener("click", () => setOpen(!app.classList.contains("drawer-open")));
+    menu.addEventListener("click", () => setOpen(!app.classList.contains("is-nav-open")));
     if (scrim) scrim.addEventListener("click", () => setOpen(false));
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") setOpen(false);
@@ -139,11 +229,11 @@
   }
 
   // --- Theme --------------------------------------------------------------------
-  // Three choices, not two: "follow the system" is the one most people want and it is
-  // the one a light/dark toggle cannot express. The attribute is set on <html> and the
-  // stylesheet does the rest, so nothing here has to know what a theme looks like.
+  // Three choices, not two: "follow the system" is what most people want and it is
+  // the one a light/dark toggle cannot express. The attribute lives on <html> and
+  // the stylesheet does the rest, so nothing here needs to know what a theme is.
   //
-  // The inline script in the document head has already applied the stored choice before
+  // The inline script in the document head already applied the stored choice before
   // the first paint; this only keeps the control in step and records changes.
 
   const THEME_KEY = "vinted-sniper-theme";
@@ -160,37 +250,18 @@
     }
   };
 
-  // Switching theme changes the entire ground under the page at once, which is not a
-  // state the person hovered or pressed. Given the stylesheet's normal transitions it
-  // would snap; given a blanket transition it would drag every hover state along with
-  // it. So it gets its own 320ms window: add a class, let the CSS swap every colour at
-  // once, take it off again. No timer survives a theme change started twice.
-  let themeTimer = null;
-  // Suppressed on the very first application: the inline script in the document head
-  // has already set the attribute before the first paint, so there is nothing to
-  // animate and putting a class on <html> would only cost a style recalculation.
-  let booted = false;
-  const crossfade = () => {
-    if (reduced || !booted) return;
-    root.classList.add("theme-changing");
-    window.clearTimeout(themeTimer);
-    themeTimer = window.setTimeout(() => root.classList.remove("theme-changing"), 340);
-  };
-
   const applyTheme = (choice) => {
-    if (choice === "light" || choice === "dark") {
-      root.setAttribute("data-theme", choice);
-    } else {
-      root.removeAttribute("data-theme");
-    }
-    crossfade();
+    // Always an explicit attribute, including "system": the stylesheet resolves
+    // "system" inside a prefers-color-scheme block, so removing the attribute
+    // would leave the page with no tokens at all.
+    root.setAttribute("data-theme", choice);
     for (const option of options) {
       option.setAttribute("aria-pressed", String(option.dataset.themeChoice === choice));
     }
   };
 
-  // While the choice is "system", follow the machine as it switches at sunset — the
-  // switcher would otherwise sit there showing "system" while contradicting it.
+  // While the choice is "system", follow the machine as it changes at sunset —
+  // otherwise the switcher would sit there claiming "system" while contradicting it.
   const followSystem = () => {
     if (readTheme() === "system") applyTheme("system");
   };
@@ -198,7 +269,6 @@
   else systemDark.addListener(followSystem);
 
   applyTheme(readTheme());
-  booted = true;
   for (const option of options) {
     option.addEventListener("click", () => {
       const choice = option.dataset.themeChoice;
@@ -212,19 +282,40 @@
     });
   }
 
+  // --- Page transitions ---------------------------------------------------------
+  // The content column cross-fades between pages, so moving around the app reads as
+  // one app changing screen rather than five documents loading. Same-document
+  // navigations only, so a form POST is never caught mid-flight.
+  if (document.startViewTransition && !reduced) {
+    document.addEventListener("click", (event) => {
+      const link = event.target.closest?.("a[href]");
+      if (!link || link.target === "_blank" || event.metaKey || event.ctrlKey) return;
+      const url = new URL(link.href, location.href);
+      if (url.origin !== location.origin) return;
+      if (url.pathname === location.pathname && url.search === location.search) return;
+      event.preventDefault();
+      document.startViewTransition(() => {
+        location.href = link.href;
+      });
+    });
+  }
+
   // --- Confirming the actions that cannot be undone -----------------------------
   // Marked in the markup rather than matched on a button's colour or text, so
   // renaming a button can never quietly remove the confirmation.
   for (const form of document.querySelectorAll("form[data-confirm]")) {
     form.addEventListener("submit", (event) => {
-      if (!window.confirm(form.dataset.confirm)) event.preventDefault();
+      window.confirmShown = false;
+      if (!window.confirm(form.dataset.confirm)) {
+        window.confirmShown = true;
+        event.preventDefault();
+      } else {
+        window.confirmShown = true;
+      }
     });
   }
 
-  // --- Disclosing the optional parts of a form -----------------------------------
-  // The panel fades in on open. Its entrance animation lives in CSS under
-  // prefers-reduced-motion: no-preference, so this only has to move the hidden
-  // attribute and the aria state.
+  // --- Disclosing the optional parts of a form ----------------------------------
   for (const toggle of document.querySelectorAll("[data-disclosure]")) {
     const target = document.getElementById(toggle.dataset.disclosure);
     if (!target) continue;
@@ -236,20 +327,18 @@
   }
 
   // --- Keyboard ----------------------------------------------------------------
-  // This is read dozens of times a day, so reaching the filter and walking the tiles
-  // without leaving the home row is the cheapest thing this interface can offer.
-  // Every shortcut is a plain keystroke: nothing here animates, because the
-  // animate skill's frequency gate says an action taken a hundred times a day does
-  // not get an entrance.
-  const tiles = [...document.querySelectorAll(".listing")];
+  // This page is read dozens of times a day, so reaching the filter and walking the
+  // finds without leaving the home row is the cheapest thing the interface can
+  // offer. Nothing here animates: an action taken a hundred times a day does not
+  // get an entrance.
+  const tiles = [...document.querySelectorAll(".tile")];
   const filter = document.getElementById("q");
   const sheet = document.getElementById("shortcut-sheet");
   let cursor = -1;
 
   const isTyping = (target) =>
     target instanceof HTMLElement &&
-    (target.isContentEditable ||
-      ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+    (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
 
   function select(index) {
     if (!tiles.length) return;
@@ -257,18 +346,14 @@
     tiles.forEach((tile, i) => tile.classList.toggle("is-cursor", i === cursor));
     const tile = tiles[cursor];
     tile.scrollIntoView({ block: "nearest", behavior: reduced ? "auto" : "smooth" });
-  }
-
-  function closeSheet() {
-    if (!sheet) return;
-    sheet.hidden = true;
+    tile.focus({ preventScroll: true });
   }
 
   document.addEventListener("keydown", (event) => {
     if (event.metaKey || event.ctrlKey || event.altKey) return;
 
     if (event.key === "Escape") {
-      closeSheet();
+      if (sheet) sheet.hidden = true;
       return;
     }
 
@@ -304,7 +389,7 @@
       return;
     }
     if (event.key === "Enter" && cursor >= 0) {
-      const link = tiles[cursor]?.querySelector(".listing-title");
+      const link = tiles[cursor]?.querySelector(".tile-title");
       if (link) {
         event.preventDefault();
         link.click();

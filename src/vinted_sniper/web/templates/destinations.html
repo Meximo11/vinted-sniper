@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% import "_icons.html" as ui %}
 
-{% block title %}Benachrichtigungen · vinted-sniper{% endblock %}
-{% block heading %}Benachrichtigungen{% endblock %}
+{% block title %}Empfänger · vinted-sniper{% endblock %}
+{% block heading %}Empfänger{% endblock %}
 
 {% macro kind_icon(kind) -%}
   {%- if kind == "telegram" -%}{{ ui.icon("telegram") }}
@@ -19,6 +19,10 @@
   {%- else -%}Webhook{%- endif -%}
 {%- endmacro %}
 
+{% block actions %}
+<a class="btn btn-primary" href="#hinzu">{{ ui.icon("plus") }}<span>Empfänger</span></a>
+{% endblock %}
+
 {% block content %}
 
 <section aria-label="Eingerichtete Empfänger">
@@ -31,9 +35,10 @@
   {% if not destinations %}
     <div class="empty">
       {{ ui.icon("bell") }}
-      <h3>Noch kein Empfänger</h3>
-      <p>Lege unten einen Empfänger an. Bis dahin werden Artikel weiterhin gefunden und
-         gespeichert. Sie haben nur niemanden, zu dem sie gehen können.</p>
+      <h3>Noch niemand, dem die Treffer gehören</h3>
+      <p>Artikel werden weiterhin gefunden und gespeichert — sie haben nur niemanden, zu
+         dem sie gehen können. Ein Empfänger ist in einer Minute eingerichtet.</p>
+      <a class="btn btn-primary" href="#hinzu">{{ ui.icon("plus") }}<span>Ersten Empfänger anlegen</span></a>
     </div>
   {% else %}
   <div class="dest-list">
@@ -150,7 +155,7 @@
   {% endif %}
 </section>
 
-<section aria-label="Empfänger hinzufügen">
+<section class="section" id="hinzu" aria-label="Empfänger hinzufügen">
   <div class="section-head">
     <h2>Empfänger hinzufügen</h2>
   </div>
@@ -183,7 +188,8 @@
         </div>
       </div>
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Empfänger hinzufügen</button>
+        <button type="submit" class="btn btn-primary"
+                data-busy-label="Wird verbunden…">{{ ui.icon("plus") }}<span>Empfänger hinzufügen</span></button>
       </div>
     </form>
   </div>

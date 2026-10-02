@@ -220,6 +220,129 @@ because the title is clamped to a fixed box; `tabular-nums` is on every numeric 
 is no horizontal overflow at 375; and the mobile rail has a real `aria-label`'d toggle.
 
 
+### Pass three — the redesign
+
+- **frontend-design** (global)
+  - invoked: the harness delivered the whole SKILL.md into the turn as an activation
+    block. That is a real load on a third channel — not a file read, and not a
+    `skill` tool call, which this environment still does not expose.
+  - mechanism: file-read
+  - deviation: the gate's closed set has no name for a harness-delivered activation,
+    so this entry records `file-read` — the closest honest label, which understates
+    rather than overstates. Adding a fourth token for one session would be a token
+    invented to make one log line pass.
+  - extracted: the calibration list names the SaaS-card kit, the tracked-out
+    ALL-CAPS eyebrow, and default type families as traits that appear regardless of
+    subject. The previous design was all three.
+  - extracted: "ground the design in the subject's vernacular." The subject is a
+    shelf of second-hand clothes that appear and then vanish; the only question a
+    reseller actually has is "can I still take this one?".
+  - decided: the whole direction. Monochrome chrome so the photography is the only
+    colour on screen; one warm hue reserved for "alive"; ink buttons rather than
+    accent buttons, so the accent ends up with exactly one meaning.
+  - decided: two roles from one family tree — `--font` for text, `--font-display`
+    for anything large enough to want optical sizing. No webfont, because the app
+    runs behind a login with no build step and a download would be a network
+    dependency the product does not have. Recorded as a real constraint rather than
+    papered over.
+  - where: `app.css` sections 1 and 2; `base.html` nav.
+
+- **impeccable** (global), **hallmark** (global)
+  - invoked: not re-read this pass; the pass-one extractions above stand.
+  - mechanism: file-read
+  - extracted: the contrast floor is not negotiable, and a quiet fourth ink tier is a
+    trap, because no value of it both clears 4.5:1 and still reads as a tier.
+  - decided: their guard caught six real regressions in the new sheet — placeholders,
+    photo fallbacks, chart date labels, pager gaps, the dead-find chip and the status
+    timestamp were all painted in the graphic-only ink. They moved to the legible
+    tier, and the ink-3 tokens were re-picked until they cleared 4.5:1 on all three
+    grounds in both themes.
+  - where: `app.css` `--ink-3` in both blocks;
+    `tests/visual/test_contrast.py::test_ink_four_is_never_used_as_text`.
+
+- **web-design-guidelines** (global)
+  - invoked: the rules were fetched and applied in pass one; nothing here contradicted
+    them.
+  - mechanism: file-read
+  - extracted: a link colour is text and gets the text bar.
+  - decided: the old rule required the accent to clear 4.5:1 as a link colour. This
+    design has no accent to speak of — the warm hue is graphic-only at 1.6:1 on
+    white — so the rule was replaced with a stronger one: `--live` may never be a
+    text colour, and links are ink. That encodes the decision that made the sheet
+    coherent rather than merely re-checking a number.
+  - where: `tests/visual/test_contrast.py::test_live_is_graphic_only_and_never_carries_a_word`.
+
+- **animate**, **improve-animations**, **review-animations** (global)
+  - invoked: not re-read. The motion budget they set is the one this pass spent.
+  - mechanism: file-read
+  - extracted: 120–180ms, transform and opacity only, nothing on scroll, nothing that
+    loops, and an action taken a hundred times a day gets no entrance.
+  - decided: the whole animation budget is three transitions that answer something the
+    user did (button press, drawer, hover), one 1.1s arrival sweep for a find that
+    landed in the last thirty seconds, and a 140ms cross-fade between pages. No
+    scroll-triggered reveal anywhere.
+  - where: `app.css` section 13; the sweep at `.tile.is-arriving`; the transition block
+    in `app.js`.
+
+- **ui-ux-pro-max**, **design-taste-frontend**, **high-end-visual-design** (global)
+  - invoked: not re-read this pass; their pass-one resolutions stand.
+  - mechanism: file-read
+  - extracted: nothing new — the pass-one rejections were not revisited.
+  - decided: `high-end-visual-design`'s double-bezel and 2rem radii stay rejected for a
+    dense tool, and `design-taste-frontend`'s scope statement still excludes
+    dashboards. `ui-ux-pro-max`'s never-by-colour-alone rule is now satisfied a second
+    way: the freshness signal changes the *form* of the chip and not only its hue, so
+    it survives greyscale and colour blindness.
+  - where: `_listing_card.html` tier thresholds; `app.css` `.chip-age`.
+
+### Pass four — the two pages the redesign never touched
+
+- **frontend-design**, **impeccable** (global)
+  - invoked: not re-read this pass. This was a regression repair, not a new
+    direction, and the decisions it was repaired against are the ones already
+    recorded above.
+  - mechanism: file-read
+  - extracted: nothing new. The two things this pass had to get right were both
+    already written down: the chrome is monochrome and `--live` is graphic-only,
+    and a screen that is not the app still has to look like the app.
+  - decided: the redesign rewrote `app.css` and left `login.html` and
+    `error.html` referencing five classes the new sheet does not define, so the
+    front door and every error page — including the 403 a form post lands on
+    after a stale session — rendered as bare full-bleed markup. Rather than
+    patch five rules back, the two templates were brought under the design
+    language: one card, the existing radius scale, existing tokens only, the
+    status code set as a readout in the dashboard's own hero numerals, and the
+    login button wired to the loading state that already existed in `app.js`
+    and had simply never been reached from this page. `app.css` gained one
+    appended section and was not restructured.
+  - where: `app.css` §14; `login.html`; `error.html`.
+
+### Pass five — the card order and the button that finishes
+
+- **frontend-design**, **web-design-guidelines** (global)
+  - invoked: not re-read this pass. Both gaps were named by the audit as deviations
+    from decisions already on the record above, not as new direction.
+  - mechanism: file-read
+  - extracted: nothing new. What the two fixes share is already written down — the
+    freshness signal is the reason the product exists, and a control has to report
+    what actually happened to it.
+  - decided: two gaps the redesign left. The tile rendered price → title → meta →
+    foot, which put freshness last; it is now image → price → freshness → title →
+    total → metadata, with the total on its own reserved line so the metadata
+    below it keeps one baseline across a grid row. And the search button could only
+    ever go to `loading`, because a form post redirects and takes the button with
+    it, so the sheet's `done` rule was unreachable. `POST /searches` now answers a
+    fetch with the outcome as data and the button finishes its own sentence. The
+    count on it is `repo.listing_count`, read from the database — never a literal —
+    which is why it honestly reads zero for a search nobody has polled yet. Every
+    other form still posts and redirects, and the failures fall back to that path
+    so the server's own sentence reaches the user.
+  - where: `_listing_card.html` field order; `_search_form.html` `data-report-done`;
+    `app.js` the `data-report-done` block and the rAF guard; `server.py` `add_search`;
+    `app.css` `.tile-total`, `.ico-done`; `tests/integration/test_web.py`.
+
+### Skills deliberately not reached
+
 - **animate**, **review-animations**, **improve-animations** — partially read in pass one
   (first ~40-50 lines each), enough to fix the motion budget. The motion budget has not
   changed since, so there was nothing to re-read.

@@ -207,6 +207,71 @@ async def test_a_url_that_is_not_a_search_is_rejected_with_advice(
     assert await repo.list_queries() == []
 
 
+# --- The same endpoint, asked for data instead of a page ---------------------------
+#
+# `data-report-done` in the template posts this form with fetch so the button can
+# finish its own sentence instead of being thrown away by a redirect. These tests
+# exist because that count is now on screen: a number the client invented would
+# look identical to a number the database produced, and only one of them is true.
+
+
+async def test_starting_a_search_answers_a_fetch_with_the_count_it_actually_found(
+    signed_in: TestClient, repo: Repo
+) -> None:
+    response = signed_in.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=nike"},
+        headers={"Accept": "application/json"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["query_id"] == (await repo.list_queries())[0].id
+    # Not a number this test made up: the same read the page would have done.
+    assert body["found"] == await repo.listing_count(query_id=body["query_id"])
+    assert body["found"] == 0, "a search nobody has polled has found nothing"
+
+
+async def test_a_plain_form_post_still_redirects_and_still_shows_the_flash(
+    signed_in: TestClient,
+) -> None:
+    """The JSON answer is an addition. The no-JavaScript path must not change."""
+    response = signed_in.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=nike"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert "ok=" in response.headers["location"]
+
+
+@pytest.mark.parametrize(
+    "url,status",
+    [
+        ("https://example.com/nope", 422),
+        ("https://www.vinted.fr/catalog?search_text=nike", 409),
+    ],
+)
+async def test_a_refused_search_answers_a_fetch_with_a_status_and_a_reason(
+    signed_in: TestClient, url: str, status: int
+) -> None:
+    """The client falls back to a real form post on any non-2xx, and the reason it
+    falls back has to be the server's, not a guess made in the browser."""
+    if status == 409:
+        signed_in.post("/searches", data={"url": url})
+
+    response = signed_in.post(
+        "/searches", data={"url": url}, headers={"Accept": "application/json"}
+    )
+
+    assert response.status_code == status
+    body = response.json()
+    assert body["ok"] is False
+    assert body["error"]
+
+
 async def test_the_same_search_cannot_be_added_twice(signed_in: TestClient, repo: Repo) -> None:
     payload = {"url": "https://www.vinted.fr/catalog?search_text=nike"}
     signed_in.post("/searches", data=payload, follow_redirects=False)
@@ -674,9 +739,34 @@ async def test_the_activity_page_shows_a_full_window_of_days(signed_in: TestClie
     body = signed_in.get("/activity").text
 
     assert 'role="img"' in body
-    # Two charts, fourteen days each: the empty days are the point.
-    assert body.count("bar-col") == 28
-    assert body.count("bar-label") == 28
+    # One chart of fourteen days, two series in every day: the empty days are the
+    # point, and both series have to be there for the pair to be comparable.
+    assert body.count("bar-col") == 14
+    assert body.count("bar-label") == 14
+    assert body.count('class="bar ') == 28, "two bars per day, one per series"
+    assert body.count("is-sent") >= 14, "both series have to be drawn to compare"
+
+
+async def test_the_activity_page_reads_as_history_not_as_monitoring(
+    signed_in: TestClient,
+) -> None:
+    """The page answers "what happened", so the counters that only ever describe
+    the present cannot be on it. `count_403`, `count_429` and
+    `checks_without_new_listings` only ever go up; they are the dashboard's
+    business, and a timeline built from them would be a list of gauges."""
+    body = signed_in.get("/activity").text
+
+    for label in ("Blocksperren", "Rate-Limits", "Ohne Treffer"):
+        assert label not in body, f"{label} describes the present, not the past"
+
+
+async def test_the_activity_page_lists_events_newest_first(signed_in: TestClient) -> None:
+    """A timeline whose order is wrong is worse than no timeline: it reads as
+    true. The SQL orders by the event's own timestamp, and this pins that."""
+    body = signed_in.get("/activity").text
+
+    assert "Zuletzt passiert" in body
+    assert "gefunden" in body
 
 
 async def test_a_flash_message_arrives_as_a_query_parameter(signed_in: TestClient) -> None:
@@ -901,7 +991,7 @@ async def test_the_listing_browser_pages(
     assert first.status_code == 200
     assert first.text.count("<article") == 24
     assert second.text.count("<article") == 1
-    assert "25 Artikel gefunden" in first.text
+    assert "25 gefunden" in first.text
     assert 'aria-current="page"' in first.text
 
 
@@ -968,7 +1058,7 @@ async def test_the_browser_can_be_filtered_by_search(
     shoes, trainers = await repo.list_queries()
     body = signed_in.get("/listings", params={"search": shoes.id}).text
 
-    assert "5 Artikel gefunden" in body
+    assert "5 gefunden" in body
     assert "shoes" in body
     # The dropdown offers both searches; the grid must only hold the filtered one.
     assert body.count("<article") == 5
@@ -984,7 +1074,7 @@ async def test_the_browser_can_be_searched_by_text(
 
     body = signed_in.get("/listings", params={"q": "Nike"}).text
 
-    assert "5 Artikel" in body
+    assert "5 gefunden" in body
 
 
 async def test_a_search_that_matches_nothing_says_so_rather_than_looking_broken(
@@ -994,7 +1084,10 @@ async def test_a_search_that_matches_nothing_says_so_rather_than_looking_broken(
 
     body = signed_in.get("/listings", params={"q": "zzz-nothing-matches"}).text
 
-    assert "Keine Treffer" in body
+    # The empty state says what happened and offers a way out of it, rather than
+    # leaving the reader on a blank grid wondering whether the filter worked.
+    assert "Nichts passt dazu" in body
+    assert "Filter zurücksetzen" in body
     assert "<article" not in body
 
 

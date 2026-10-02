@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% import "_icons.html" as ui %}
 {% import "_listing_card.html" as cards %}
+{% from "_pager.html" import pager %}
 
 {% block title %}Übersicht · vinted-sniper{% endblock %}
 {% block heading %}Übersicht{% endblock %}
@@ -11,119 +12,102 @@
 
 {% block content %}
 
-{# --- Die Triage -----------------------------------------------------------------
-     Die Nachrichten dieses Werkzeugs haben zwei Arten: ein frischer Treffer ist ein
-     Gewinn, ein toter Empfänger ist ein Verlust. Das alte Dashboard hat beides in
-     eine Statusleiste und vier neutrale Kacheln gepresst — ein schlechter Tag und
-     ein guter sahen gleich aus.
+{# --- Die zwei Fragen --------------------------------------------------------
+     Diese Seite hat genau zwei Antworten zu geben: Was habe ich gefangen, und
+     was braucht Aufmerksamkeit? Beide stehen oben, in der Sprache des Menschen,
+     nicht als Kachelraster.
 
-     Darum oben zwei Zonen, durch eine Haarlinie getrennt. Sie können sich widersprechen,
-     und wenn sie es tun, ist das Problem sichtbar, ohne dass irgendetwas gelesen
-     werden muss. Das sind Ablesestände in einem Instrumentenblock, keine Karten: eine
-     Karte pro Zahl wäre genau die Kachelvorlage, die der Gestaltungsboden verbietet,
-     sechsmal angewandt. #}
+     Der Kassenbonz ist die Antwort auf die erste Frage. Eine Zahl in
+     Schreibschriftgröße, ein Wort daneben, ein Strich darunter — kein Karten,
+     weil vier Karten nebeneinander genau das Raster sind, das hier nichts
+     erklärt. Die zweite Frage ist ein Streifen, und er taucht nur auf, wenn es
+     etwas zu tun gibt. #}
 
 {% set backlog = outbox.pending + outbox.sending %}
-<div class="triage">
-  <section class="triage-zone" aria-labelledby="triage-gewinn">
-    <h2 id="triage-gewinn">Gewinn</h2>
-    <dl class="triage-readouts">
-      <div class="readout">
-        <dt>Heute</dt>
-        <dd>{{ found_today }}</dd>
-      </div>
-      <div class="readout">
-        <dt>7 Tage</dt>
-        <dd>{{ found_week }}</dd>
-      </div>
-      <div class="readout is-quiet">
-        <dt>Zugestellt</dt>
-        <dd>{{ outbox.sent }}</dd>
-      </div>
-    </dl>
-  </section>
+{% set attention = (unhealthy or outbox.failed or destinations_off or backlog) %}
 
-  <div class="triage-rule" role="presentation"></div>
-
-  <section class="triage-zone" aria-labelledby="triage-todo">
-    <h2 id="triage-todo">Zu tun</h2>
-    {% if unhealthy or outbox.failed or destinations_off or backlog %}
-    <dl class="triage-readouts">
-      {% if unhealthy %}
-      <div class="readout is-bad">
-        <dt>Suchen</dt>
-        <dd>{{ unhealthy }}<small> kaputt</small></dd>
-      </div>
-      {% endif %}
-      {% if outbox.failed %}
-      <div class="readout is-bad">
-        <dt>Zustellung</dt>
-        <dd>{{ outbox.failed }}<small> fehlgeschlagen</small></dd>
-      </div>
-      {% endif %}
-      {% if destinations_off %}
-      <div class="readout is-warn">
-        <dt>Empfänger</dt>
-        <dd>{{ destinations_off | length }}<small> inaktiv</small></dd>
-      </div>
-      {% endif %}
-      {% if backlog %}
-      <div class="readout is-warn">
-        <dt>Warteschlange</dt>
-        <dd>{{ backlog }}</dd>
-      </div>
-      {% endif %}
-    </dl>
-    {% else %}
-    {# Eine ruhige Zone sagt es in Worten. Eine Reihe von Nullen liest sich wie eine
-       Messung, und ist hier keine. #}
-    <p class="triage-allclear">
-      {{ ui.icon("check") }}<span>Nichts. Alles läuft.</span>
-    </p>
-    {% endif %}
-  </section>
+<div class="receipt">
+  <div class="receipt-item">
+    <span class="n">{{ found_today }}</span>
+    <span class="k">heute gefunden</span>
+  </div>
+  <div class="receipt-item is-quiet">
+    <span class="n">{{ found_week }}</span>
+    <span class="k">in 7 Tagen</span>
+  </div>
+  <div class="receipt-item is-quiet">
+    <span class="n">{{ outbox.sent }}</span>
+    <span class="k">zugestellt</span>
+  </div>
+  {# Die Zahl der Probleme gehört nicht hierher. Dieser Bonz beantwortet eine
+     Frage — was habe ich gefangen — und die zweite Frage beantwortet der Streifen
+     darunter. Eine rote Zahl in Schreibschriftgröße darüber wäre lauter als die
+     Funde selbst. #}
 </div>
 
-{# --- Was man sich ansehen muss ----------------------------------------------------- #}
-{% if recent_failures or destinations_off %}
+{% if attention %}
 <section class="section" aria-label="Braucht Aufmerksamkeit">
-  <div class="section-head">
-    <h2>Braucht Aufmerksamkeit</h2>
-    <div class="spacer"></div>
-    <a class="btn btn-quiet btn-sm" href="/searches">Suchen prüfen</a>
-  </div>
-  <div class="table-wrap">
-    <div class="attention">
-      {% for failure in recent_failures %}
-      <div class="attention-row">
-        {{ ui.icon("alert") }}
-        <div class="body">
-          <div class="cell-title">{{ failure.query_name }}</div>
-          <div class="cell-note">
-            {{ failure.last_status }}{% if failure.last_error %}: {{ failure.last_error }}{% endif %}
-          </div>
+  <div class="attention">
+    {% for failure in recent_failures %}
+    <div class="attention-row">
+      {{ ui.icon("alert") }}
+      <div class="body">
+        <div class="cell-title">{{ failure.query_name }} liefert nicht mehr</div>
+        <div class="cell-note">
+          {{ failure.last_status }}{% if failure.last_error %}: {{ failure.last_error }}{% endif %}
         </div>
-        <span class="when">{{ _age(failure.last_polled_at, now) }}</span>
       </div>
-      {% endfor %}
-
-      {% for destination in destinations_off %}
-      <div class="attention-row">
-        {{ ui.icon("bell") }}
-        <div class="body">
-          <div class="cell-title">{{ destination.name }} empfängt keine Benachrichtigungen</div>
-          <div class="cell-note">{{ destination.deactivated_reason or 'Abgeschaltet.' }}</div>
-        </div>
-        <a class="btn btn-sm" href="/destinations">Prüfen</a>
-      </div>
-      {% endfor %}
+      <span class="when">{{ _age(failure.last_polled_at, now) }}</span>
     </div>
+    {% endfor %}
+
+    {% for destination in destinations_off %}
+    <div class="attention-row">
+      {{ ui.icon("bell") }}
+      <div class="body">
+        <div class="cell-title">{{ destination.name }} empfängt nichts mehr</div>
+        <div class="cell-note">{{ destination.deactivated_reason or 'Abgeschaltet.' }}</div>
+      </div>
+      <a class="btn btn-sm" href="/destinations">Prüfen</a>
+    </div>
+    {% endfor %}
+
+    {% if unhealthy %}
+    <div class="attention-row">
+      {{ ui.icon("pause") }}
+      <div class="body">
+        <div class="cell-title">{{ unhealthy }} {{ 'Suche' if unhealthy == 1 else 'Suchen' }} {{ 'steht' if unhealthy == 1 else 'stehen' }} still</div>
+        <div class="cell-note">Meist ist die Vinted-Sitzung abgelaufen. Einmal neu laden genügt.</div>
+      </div>
+      <a class="btn btn-sm" href="/searches">Ansehen</a>
+    </div>
+    {% endif %}
+
+    {% if outbox.failed %}
+    <div class="attention-row">
+      {{ ui.icon("send") }}
+      <div class="body">
+        <div class="cell-title">{{ outbox.failed }} Benachrichtigungen nicht zugestellt</div>
+        <div class="cell-note">Nach sechs Versuchen aufgegeben. Der Empfänger ist meist der Grund.</div>
+      </div>
+      <a class="btn btn-sm" href="/destinations">Empfänger</a>
+    </div>
+    {% endif %}
+
+    {% if backlog %}
+    <div class="attention-row">
+      {{ ui.icon("clock") }}
+      <div class="body">
+        <div class="cell-title">{{ backlog }} warten auf Zustellung</div>
+        <div class="cell-note">Das ist normal und läuft von selbst ab.</div>
+      </div>
+    </div>
+    {% endif %}
   </div>
 </section>
 {% endif %}
 
-{# --- Zuletzt gefunden. Das Foto führt, der Preis steht daneben, und die Verfallslinie
-     unten zeigt, wie lange der Fund noch lebt. ------------------------------------- #}
+{# --- Die Funde. Das Foto führt. -------------------------------------------- #}
 <section class="section" aria-label="Zuletzt gefunden">
   <div class="section-head">
     <h2>Zuletzt gefunden</h2>
@@ -131,18 +115,20 @@
     <a class="btn btn-quiet btn-sm" href="/listings">{{ ui.icon("box") }}<span>Alle ansehen</span></a>
   </div>
   {% if not recent %}
-    {{ cards.empty("Noch nichts gefunden",
-        "Lege eine Suche an, und die Treffer erscheinen hier, sobald sie eingestellt werden. Die erste Abfrage läuft still. Du wirst also nicht von einer Wand aus Meldungen empfangen.") }}
+    {{ cards.empty(
+        "Noch nichts gefunden",
+        "Sobald du eine Suche anlegst, landen die Treffer hier — mit dem Alter, damit du siehst, was noch zu holen ist.",
+        "/searches#neu", "Erste Suche anlegen") }}
   {% else %}
     {{ cards.grid(recent) }}
   {% endif %}
 </section>
 
-{# --- Beobachtete Suchen ------------------------------------------------------------ #}
+{# --- Beobachtete Suchen ---------------------------------------------------- #}
 {% if snapshot.searches %}
 <section class="section" aria-label="Beobachtete Suchen">
   <div class="section-head">
-    <h2>Beobachtete Suchen</h2>
+    <h2>Laufende Suchen</h2>
     <div class="spacer"></div>
     <a class="btn btn-quiet btn-sm" href="/searches">Verwalten</a>
   </div>
@@ -177,7 +163,7 @@
               <form method="post" action="/searches/{{ search.query_id }}/pause" class="inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <input type="hidden" name="paused" value="{{ '0' if search.paused else '1' }}">
-                <button class="btn btn-quiet btn-sm" type="submit">
+                <button class="btn btn-quiet btn-sm" type="submit" data-busy-label="Wird gespeichert…">
                   {% if search.paused %}{{ ui.icon("play") }}<span>Fortsetzen</span>
                   {% else %}{{ ui.icon("pause") }}<span>Anhalten</span>{% endif %}
                 </button>

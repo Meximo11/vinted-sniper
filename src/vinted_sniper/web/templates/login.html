@@ -1,11 +1,29 @@
 {% import "_icons.html" as ui %}<!doctype html>
-<html lang="de">
+<html lang="de" data-theme="system">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
+  {# Wie auf base.html: der Browserrahmen gehört zur Seite, und die gespeicherte
+     Theme-Wahl gilt auch hier — sonst landet jemand, der dunkel arbeitet, beim
+     Ausloggen auf einer weißen Seite. #}
+  <meta name="theme-color" content="#fbfaf8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121110" media="(prefers-color-scheme: dark)">
   <title>Anmelden · vinted-sniper</title>
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem("vinted-sniper-theme");
+        if (stored === "light" || stored === "dark" || stored === "system") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      } catch (error) {
+        /* Privater Modus. Die Systemvorgabe gilt trotzdem. */
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="/static/app.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%2317150f'/><circle cx='16' cy='16' r='6.5' fill='none' stroke='%23ffc24d' stroke-width='2.5'/><circle cx='16' cy='16' r='1.75' fill='%23ffc24d'/></svg>">
 </head>
 {# Keine App-Hülle hier. Jeder Link in der Seitenleiste würde direkt auf diese Seite
    zurückführen, was sich wie kaputte Navigation liest, nicht wie eine gesperrte. #}
@@ -32,7 +50,13 @@
         <p class="hint">Der Wert von <code class="mono">VINTED_SNIPER_WEB_AUTH_TOKEN</code>.</p>
       </div>
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Anmelden</button>
+        {# data-busy-label und das span sind die ganze Schnittstelle zu app.js: der
+           Knopf meldet selbst, dass er arbeitet, statt dass irgendwo ein Toast
+           aufgeht. Das Skript ist auf dieser Seite harmlos — es prüft jedes Element
+           auf Anwesenheit, bevor es es benutzt. #}
+        <button type="submit" class="btn btn-primary" data-busy-label="Wird geprüft…">
+          <span>Anmelden</span>
+        </button>
       </div>
     </form>
 
@@ -41,5 +65,6 @@
       bevor es irgendwo hingeht, wo es nicht auf deinem eigenen Rechner liegt.
     </p>
   </main>
+  <script src="/static/app.js"></script>
 </body>
 </html>

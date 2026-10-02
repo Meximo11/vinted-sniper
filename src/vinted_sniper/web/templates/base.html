@@ -1,31 +1,28 @@
 {% import "_icons.html" as ui %}<!doctype html>
-<html lang="de">
+<html lang="de" data-theme="system">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
-  {# Matches --bg in each theme, so the browser chrome around the page is part of it
-     rather than a white band above a dark app. #}
-  <meta name="theme-color" content="#f4f6f7" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#0c1013" media="(prefers-color-scheme: dark)">
+  {# Entspricht --paper in beiden Themen. Der Browserrahmen gehört zur Seite, nicht
+     als weißer Streifen darüber. #}
+  <meta name="theme-color" content="#fbfaf8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#121110" media="(prefers-color-scheme: dark)">
   <title>{% block title %}vinted-sniper{% endblock %}</title>
-  {# Läuft vor dem Stylesheet, damit die Seite nie im falschen Thema erscheint und einen
-     Bildschirm später in das richtige springt. Bewusst inline: ein externes Skript ist
-     eine Anfrage, und eine Anfrage ist eine Gelegenheit für einen Aufblitzer. #}
   <script>
     (function () {
       try {
         var stored = localStorage.getItem("vinted-sniper-theme");
-        if (stored === "light" || stored === "dark") {
+        if (stored === "light" || stored === "dark" || stored === "system") {
           document.documentElement.setAttribute("data-theme", stored);
         }
       } catch (error) {
-        /* Privater Modus, oder Speicher gesperrt. Die Systemvorgabe gilt trotzdem. */
+        /* Privater Modus. Die Systemvorgabe gilt trotzdem. */
       }
     })();
   </script>
   <link rel="stylesheet" href="/static/app.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230a7076'/><circle cx='16' cy='16' r='7' fill='none' stroke='white' stroke-width='2'/><circle cx='16' cy='16' r='2' fill='white'/></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%2317150f'/><circle cx='16' cy='16' r='6.5' fill='none' stroke='%23ffc24d' stroke-width='2.5'/><circle cx='16' cy='16' r='1.75' fill='%23ffc24d'/></svg>">
 </head>
 <body>
   <a class="skip-link" href="#main">Zum Inhalt springen</a>
@@ -33,47 +30,48 @@
   <div class="app" id="app">
     <div class="nav-scrim" id="nav-scrim" hidden></div>
 
-    <aside class="rail" id="rail">
+    {# Kein Panel, kein Rahmen, kein Hintergrund. Eine Seitenleiste ist eine Box,
+       und das hier ist keine. Genau das unterscheidet eine App von einem
+       Adminbereich. #}
+    <aside class="nav" id="rail">
       <a class="brand" href="/">
         <span class="mark">{{ ui.icon("target") }}</span>
         <span>vinted-sniper</span>
       </a>
 
-      <nav class="nav" aria-label="Bereiche">
+      <nav class="nav-list" aria-label="Bereiche">
         <a class="nav-link" href="/" {% if nav == "dashboard" %}aria-current="page"{% endif %}>
           {{ ui.icon("activity") }}<span>Übersicht</span>
         </a>
         <a class="nav-link" href="/searches" {% if nav == "searches" %}aria-current="page"{% endif %}>
           {{ ui.icon("search") }}<span>Suchen</span>
-          {% if search_counts %}<span class="count">{{ search_counts.active }}</span>{% endif %}
+          {% if search_counts %}<span class="nav-count">{{ search_counts.active }}</span>{% endif %}
         </a>
         <a class="nav-link" href="/destinations" {% if nav == "destinations" %}aria-current="page"{% endif %}>
           {{ ui.icon("bell") }}<span>Empfänger</span>
           {% if active_destinations is defined %}
-            <span class="count">{{ active_destinations }}</span>
+            <span class="nav-count">{{ active_destinations }}</span>
           {% endif %}
         </a>
         <a class="nav-link" href="/listings" {% if nav == "listings" %}aria-current="page"{% endif %}>
           {{ ui.icon("box") }}<span>Artikel</span>
         </a>
         <a class="nav-link" href="/activity" {% if nav == "activity" %}aria-current="page"{% endif %}>
-          {{ ui.icon("clock") }}<span>Aktivität</span>
+          {{ ui.icon("clock") }}<span>Verlauf</span>
         </a>
       </nav>
 
-      <div class="rail-foot">
-        {# --- Ein einziger Ort, an dem der Laufzustand sichtbar ist -------------------
-             Vorher stand derselbe Zustand zweimal auf derselben Seite: hier in der
-             Seitenleiste und noch einmal als Statusleiste oben. Zwei Antworten auf
-             dieselbe Frage, an zwei Stellen, die der Auge gegeneinander abgleichen
-             musste. Jetzt gibt es nur eine. #}
+      <div class="nav-foot">
+        {# --- Ein einziger Ort, an dem der Laufzustand sichtbar ist --------------
+             Vorher stand derselbe Zustand zweimal auf derselben Seite. Jetzt gibt
+             es nur eine, und er sagt ein Wort statt vier Kacheln. #}
         {% if snapshot %}
         <div class="pulse {% if not snapshot.alive %}bad{% elif unhealthy %}warn{% endif %}"
              role="status">
           <span class="dot" aria-hidden="true"></span>
           <span>
             {%- if not snapshot.alive -%}Antwortet nicht
-            {%- elif unhealthy -%}{{ unhealthy }} brauchen Aufmerksamkeit
+            {%- elif unhealthy -%}{{ unhealthy }} {{ 'Suche' if unhealthy == 1 else 'Suchen' }} still
             {%- else -%}Läuft{%- endif -%}
           </span>
           {% if last_success_at %}

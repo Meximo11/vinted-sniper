@@ -6,6 +6,10 @@
 {% block title %}Artikel · vinted-sniper{% endblock %}
 {% block heading %}Artikel{% endblock %}
 
+{% block actions %}
+<a class="btn btn-quiet" href="/searches#neu">{{ ui.icon("plus") }}<span>Neue Suche</span></a>
+{% endblock %}
+
 {% block content %}
 
 <form class="filters" method="get" action="/listings" role="search">
@@ -35,14 +39,18 @@
 
 {% if not listings %}
   {% if filter_text or filter_query %}
-    {{ cards.empty("Keine Treffer", "Kein Artikel passt zu diesem Filter. Versuche ein kürzeres Wort oder setz den Filter zurück, um wieder alles zu sehen.") }}
+    {{ cards.empty("Nichts passt dazu",
+        "Kein Artikel passt zu diesem Filter. Versuch ein kürzeres Wort, oder setz den Filter zurück und sieh wieder alles.",
+        "/listings", "Filter zurücksetzen") }}
   {% else %}
-    {{ cards.empty("Noch nichts gefunden", "Treffer erscheinen hier, sobald eine Suche etwas findet. Bis dahin gibt es nichts zu blättern.") }}
+    {{ cards.empty("Noch nichts gefunden",
+        "Sobald eine Suche etwas findet, steht es hier zum Blättern. Bis dahin ist diese Seite leer.",
+        "/searches#neu", "Erste Suche anlegen") }}
   {% endif %}
 {% else %}
   <section class="section" aria-label="Gefundene Artikel">
     <div class="section-head">
-      <h2>{{ '{:,}'.format(total) | replace(',', '.') }} Artikel gefunden</h2>
+      <h2>{{ '{:,}'.format(total) | replace(',', '.') }} gefunden</h2>
       <div class="spacer"></div>
       <span class="hint">Seite {{ page }} von {{ pages }}</span>
     </div>

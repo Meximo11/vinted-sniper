@@ -1,59 +1,89 @@
 {% import "_icons.html" as ui %}
 
-{# Ein gefundener Artikel. Das Foto führt, weil darüber entschieden wird: ein
-   gebrauchter Artikel wird vom Bild her beurteilt, und das ist das eine, was diese
-   Oberfläche nicht verdecken darf.
+{# Ein gefundener Artikel.
 
-   Die Reihenfolge des Restes war vorher falsch, und das war keine Geschmacksfrage.
-   Vinted-Titel sind von Verkäufern geschrieben und unzuverlässig ("Nike pro maat s"),
-   das Alter eines Fundes ist für Wiederverkäufer die entscheidende Zahl, und der
-   Gesamtpreis ist das, was tatsächlich gezahlt wird. Deshalb: Preis und Alter nach
-   vorn, der Titel auf zwei Zeilen gestutzt, der Gesamtpreis aus seiner grauen
-   Fußnote herauf. #}
+   Reihenfolge, und sie ist nicht verhandelbar: Bild, Preis, Alter, Titel,
+   Gesamtpreis, Metadaten. Man erkennt ein Kleidungsstück am Bild, entscheidet
+   über den Preis, und der Name ist das Letzte, was zählt.
+
+   Die Verfallsanzeige ist kein Strich mehr. Sie besteht aus vier Dingen, die
+   zusammen arbeiten:
+
+     · die Kante der Kachel wird warm, je frischer der Fund
+     · über dem Foto liegt ein Glimmen, das nach unten verlischt
+     · der Alters-Chip wechselt die FORM: gefüllte Pille mit Punkt, dann ein
+       hohler Ring, dann schlichte Schrift, dann durchgestrichen
+     · ein eben gelandeter Fund bekommt einmalig einen Lichtstreifen
+
+   Die Chips formen zu lassen ist der Grund, warum es ohne 2px-Linie geht: Form
+   überlebt Graustufen und Farbfehlsichtigkeit. #}
 
 {% macro card(row) -%}
-<article class="listing{% if not row.freshness %} is-cold{% endif %}"
-         style="--fresh: {{ '%.3f' % row.freshness }}">
+{%- set fresh = row.freshness -%}
+{# Die Stufen sind nach ALTER gestaffelt, nicht nach Anteil. Der Anteil verteilt
+   sich in einem aktiven Feed so, dass fast alles oben "heiß" wäre — genau der
+   Fehler, den die alte 2px-Linie hatte, nur in anderer Form. Nach Alter staffeln
+   heißt: heiß ist echt neu, und ein Fund, der seit fünf Minuten steht, sieht
+   auch nach fünf Minuten aus. #}
+{%- set age = row.caught_seconds if row.caught_seconds is not none else 999999 -%}
+{%- set tier = 'cold' if not fresh else ('hot' if age < 90 else ('warm' if age < 420 else 'cool')) -%}
+{%- set arriving = age < 30 -%}
+<article class="tile{% if not fresh %} is-cold{% endif %}{% if arriving %} is-arriving{% endif %}"
+         data-tier="{{ tier }}" tabindex="-1"
+         style="--fresh: {{ '%.3f' % fresh }}">
   {% if row.photos %}
-  <button type="button" class="listing-photo" data-photos='{{ row.photos | tojson }}'
-          aria-label="{{ row.photos | length }} Bild{{ 'er' if row.photos | length > 1 }} von {{ row.title }} ansehen">
+  <button type="button" class="tile-media" data-photos='{{ row.photos | tojson }}'
+          aria-label="{{ row.photos | length }} Bild{{ 'er' if row.photos | length > 1 }} von {{ row.title }} vergrößern">
     <span class="photo-fallback" aria-hidden="true">{{ ui.icon("image") }}<span>Kein Bild</span></span>
-    <img src="{{ row.photos[0] }}" alt="" loading="lazy">
+    <img src="{{ row.photos[0] }}" alt="" loading="lazy" decoding="async">
     {% if row.photos | length > 1 %}
     <span class="photo-count">{{ ui.icon("image") }}{{ row.photos | length }}</span>
     {% endif %}
   </button>
   {% else %}
-  <div class="listing-photo">
+  <div class="tile-media">
     <span class="photo-fallback" aria-hidden="true">{{ ui.icon("image") }}<span>Kein Bild</span></span>
   </div>
   {% endif %}
 
-  <div class="listing-body">
-    <div class="listing-price">
+  <div class="tile-body">
+    <div class="tile-price">
       {% if row.price %}
         <span class="now">{{ row.price }}</span>
       {% else %}
         <span class="now faint">Preis unbekannt</span>
       {% endif %}
-      {% if row.total_price %}
-        <span class="total">{{ row.total_price }} gesamt</span>
-      {% endif %}
     </div>
 
-    <a class="listing-title" href="{{ row.url }}" target="_blank" rel="noreferrer"
+    {# Das Alter, an dritter Stelle — direkt unter dem Preis. Es stand vorher in
+       der Fußzeile unter dem Verkäufer, was das eine Signal, für das dieses
+       Produkt gebaut ist, zum letzten Ding gemacht hat, das man auf der Kachel
+       gelesen hat. Preis, Frische, was ist es: das ist die Frage, die offene
+       bleibt, und sie gehört in diese Reihenfolge. #}
+    <span class="chip-age">
+      {%- if tier == 'hot' -%}<span class="pip" aria-hidden="true"></span>{%- endif -%}
+      {{ row.age }}
+    </span>
+
+    <a class="tile-title" href="{{ row.url }}" target="_blank" rel="noreferrer"
        title="{{ row.title }}">{{ row.title }}</a>
 
+    {# Der Gesamtpreis auf eigener Zeile, nach dem Titel. Die Zeile bleibt auch
+       dann stehen, wenn es keinen Gesamtpreis gibt — aus demselben Grund, aus
+       dem der Titel zwei Zeilen reserviert: eine Kachelzeile, deren unterste
+       Zeile auf halber Höhe sitzt, liest sich kaputt und nicht dicht. #}
+    <div class="tile-total">{% if row.total_price %}{{ row.total_price }} gesamt{% endif %}</div>
+
     {% if row.brand or row.size or row.condition %}
-    <div class="listing-tags">
+    <div class="tile-tags">
       {% if row.brand %}<span class="tag tag-brand">{{ row.brand }}</span>{% endif %}
       {% if row.size %}<span class="tag">{{ row.size }}</span>{% endif %}
       {% if row.condition %}<span class="tag">{{ row.condition }}</span>{% endif %}
     </div>
     {% endif %}
 
-    {% if row.seller_login or row.seller_stars or row.favourite_count %}
-    <div class="listing-meta">
+    {% if row.seller_login or row.seller_stars or row.favourite_count or row.query_name %}
+    <div class="tile-meta">
       {% if row.favourite_count %}
         <span>{{ ui.icon("heart") }} {{ row.favourite_count }}</span>
       {% endif %}
@@ -65,20 +95,14 @@
         <a href="{{ row.seller_url }}" target="_blank" rel="noreferrer">@{{ row.seller_login }}</a>
         {%- else -%}<span>@{{ row.seller_login }}</span>{%- endif -%}
       {% endif %}
+      {# Die Suche, aus der der Fund kam, ist Metadatum und gehört mit den
+         anderen. Früher stand hier in jeder Zeile "Nicht zugeordnet", wenn ein
+         Fund keiner Suche zugeordnet war — 24 Kopien eines toten Satzes, und auf
+         375 px noch als "Nicht zuge…". Fehlt die Quelle, fehlt der Platz. #}
+      {% if row.query_name %}<span class="tile-source">{{ row.query_name }}</span>{% endif %}
     </div>
     {% endif %}
-
-    <div class="listing-foot">
-      <span class="source">{{ row.query_name or 'Nicht zugeordnet' }}</span>
-      <span class="age">{{ row.age }}</span>
-    </div>
   </div>
-
-  {# Die Verfallslinie. Ihre Breite ist der Anteil des Fensters, der übrig ist; bei
-     null ist der Fund vorbei und die Kachel sagt das, statt so zu tun, als wäre er
-     noch einer. Kein generisches Dashboard kann das: nur hier steht ein auf die
-     Sekunde genaues "wann haben wir ihn gefunden". #}
-  <div class="decay" aria-hidden="true"></div>
 </article>
 {%- endmacro %}
 
@@ -90,10 +114,15 @@
 {%- endmacro %}
 
 
-{% macro empty(title, body) -%}
+{# Eine leere Seite ist eine Einladung. Deshalb hat dieser Zustand immer einen
+   Knopf am Ende — vorher standen hier drei leere Kästen ohne Ausgang. #}
+{% macro empty(title, body, action=None, action_label=None) -%}
 <div class="empty">
-  {{ ui.icon("box") }}
+  {{ ui.icon("image") }}
   <h3>{{ title }}</h3>
   <p>{{ body }}</p>
+  {% if action and action_label %}
+  <a class="btn btn-primary" href="{{ action }}">{{ ui.icon("plus") }}<span>{{ action_label }}</span></a>
+  {% endif %}
 </div>
 {%- endmacro %}

@@ -1,39 +1,43 @@
-{# Das Formular zum Anlegen einer Suche. Ein Include statt zweier Kopien: Die IDs des
-   Aufbauassistenten und sein Skript sind auf genau ein Formular geschrieben, und zwei
-   Fassungen würden auseinanderlaufen.
+{% import "_icons.html" as ui %}
 
-   Zwei Dinge, die vorher fehlten und hier neu sind:
+{# Das Formular zum Anlegen einer Suche.
 
-   Die Ladezustände. Kategorien, Marken, Zustände, Farben und Größen kommen von fünf
-   verschiedenen Endpunkten und brauchen ihre Zeit. Vorher stand dort, während sie
-   kamen, ein grauer Satz — und ein Satz, der noch lädt, sieht aus wie ein Satz, der
-   nichts gefunden hat. Genau diese Verwechslung war die ganze Zeit möglich.
+   Progressive Offenlegung. Eine Suche zu starten braucht genau zwei Dinge:
+   eine Vinted-Adresse und irgendwohin, wohin die Treffer gehen sollen. Beides
+   ist sichtbar. Alles andere — Name, Intervall, Preisgrenze, Ausschlusswörter —
+   hat sinnvolle Vorgaben und liegt deshalb hinter einem Aufklapper. Vorher
+   lagen sechs gleichwertige Felder nebeneinander, und wer einfach nur loslegen
+   wollte, musste an allen vorbei.
 
-   Die Schrittnummern. Der Aufbauassistent ist tatsächlich eine Abfolge, deshalb
-   tragen die Nummern hier Information. Das ist die einzige Stelle in dieser
-   Oberfläche, an der eine Zahl als Verzifferung erlaubt ist. #}
+   Die Ladezustände bleiben: Kategorien, Marken, Zustände, Farben und Größen
+   kommen von fünf verschiedenen Endpunkten. Ein Satz, der noch lädt, sieht aus
+   wie ein Satz, der nichts gefunden hat — genau diese Verwechslung war vorher
+   die ganze Zeit möglich. Ein Gerippe kann man nicht mit einer Antwort
+   verwechseln. #}
 
-<form method="post" action="/searches">
+{# data-report-done: this one form is posted with fetch so the button can finish
+   its own sentence. Every other form on the site still posts and redirects.
+   Without JavaScript this form behaves exactly as it always did. #}
+<form method="post" action="/searches" data-report-done>
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
   <div class="steps">
 
-    {# --- Schritt 1: wonach gesucht wird ---------------------------------------- #}
+    {# --- Wonach gesucht wird -------------------------------------------------- #}
     <div class="step">
-      <span class="step-head"><span class="step">1</span>Wonach gesucht wird</span>
+      <span class="step-head"><span class="step-num">1</span>Wonach gesucht wird</span>
 
       <div class="url-row">
         <input type="url" id="url" name="url" required
-               placeholder="https://www.vinted.de/catalog?search_text=..."
+               placeholder="Adresse von der Vinted-Suche hier einfügen"
                aria-describedby="url-hint">
         {% if builder_enabled %}
         <button type="button" class="btn btn-quiet" id="builder-toggle" aria-expanded="false"
-                aria-controls="builder">Selbst zusammenstellen ▾</button>
+                aria-controls="builder">Selbst zusammenstellen</button>
         {% endif %}
       </div>
       <p class="hint" id="url-hint">
-        Der einfachste Weg: Richte die Suche auf Vinted ein und kopiere die Adresszeile,
-        sobald Ergebnisse zu sehen sind.
+        Der einfachste Weg: Suche auf Vinted einstellen, Adresse kopieren, hier einfügen.
       </p>
 
       {% if builder_enabled %}
@@ -114,55 +118,70 @@
       {% endif %}
     </div>
 
-    {# --- Schritt 2: wohin damit, und wie oft ------------------------------------ #}
+    {# --- Wohin damit ----------------------------------------------------------- #}
+    {% if destinations %}
     <div class="step">
-      <span class="step-head"><span class="step">2</span>Wohin und wie oft</span>
-
-      <div class="form-grid">
-        <div class="field">
-          <label for="name">Name</label>
-          <input type="text" id="name" name="name" placeholder="Wird aus der Suche abgeleitet">
-        </div>
-        <div class="field">
-          <label for="interval">Abfrageintervall (Sekunden)</label>
-          <input type="text" id="interval" name="interval"
-                 value="{{ default_interval }}" inputmode="numeric">
-          <p class="hint">Mindestens {{ min_interval }} s.</p>
-        </div>
-        <div class="field">
-          <label for="max_total_price">Maximaler Gesamtpreis</label>
-          <input type="text" id="max_total_price" name="max_total_price"
-                 inputmode="decimal" placeholder="z. B. 40">
-          <p class="hint">Was du wirklich zahlst, inklusive Käuferschutz.</p>
-        </div>
-        <div class="field">
-          <label for="banned_keywords">Ausgeschlossene Wörter</label>
-          <input type="text" id="banned_keywords" name="banned_keywords"
-                 placeholder="fake, replica">
-          <p class="hint">Mit Komma getrennt.</p>
-        </div>
+      <span class="step-head"><span class="step-num">2</span>Wohin die Treffer gehen</span>
+      <div class="check-grid">
+        {% for destination in destinations if destination.active %}
+        <label class="check">
+          <input type="checkbox" name="destination_ids" value="{{ destination.id }}" checked>
+          {{ destination.name }}
+        </label>
+        {% endfor %}
       </div>
+      <p class="hint">Ohne Empfänger werden Treffer weiterhin gefunden, nur eben nicht verschickt.</p>
+    </div>
+    {% endif %}
 
-      {% if destinations %}
-      <div class="field">
-        <span class="step-head">Treffer senden an</span>
-        <div class="check-grid">
-          {% for destination in destinations if destination.active %}
-          <label class="check">
-            <input type="checkbox" name="destination_ids" value="{{ destination.id }}" checked>
-            {{ destination.name }}
-          </label>
-          {% endfor %}
+    {# --- Feinabstimmung. Alles hier ist optional und hat eine Vorgabe. -------- #}
+    <div class="step">
+      <button type="button" class="disclosure-head" data-disclosure="fein"
+              aria-expanded="false" aria-controls="fein">
+        <span class="step-num">3</span>Feinabstimmung
+        {{ ui.icon("chevron") }}
+      </button>
+
+      <div id="fein" class="disclosure-panel" hidden>
+        <div class="form-grid">
+          <div class="field">
+            <label for="name">Name</label>
+            <input type="text" id="name" name="name" placeholder="Wird aus der Suche abgeleitet">
+          </div>
+          <div class="field">
+            <label for="interval">Abfrageintervall (Sekunden)</label>
+            <input type="text" id="interval" name="interval"
+                   value="{{ default_interval }}" inputmode="numeric">
+            <p class="hint">Mindestens {{ min_interval }} s.</p>
+          </div>
+          <div class="field">
+            <label for="max_total_price">Maximaler Gesamtpreis</label>
+            <input type="text" id="max_total_price" name="max_total_price"
+                   inputmode="decimal" placeholder="z. B. 40">
+            <p class="hint">Was du wirklich zahlst, inklusive Käuferschutz.</p>
+          </div>
+          <div class="field">
+            <label for="banned_keywords">Ausgeschlossene Wörter</label>
+            <input type="text" id="banned_keywords" name="banned_keywords"
+                   placeholder="fake, replica">
+            <p class="hint">Mit Komma getrennt.</p>
+          </div>
         </div>
-      </div>
-      {% endif %}
-
-      <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Suche beobachten</button>
       </div>
     </div>
 
+    <div class="form-actions">
+      {# The check sits in an <i>, not a <span>: app.js swaps the text of the
+         button's *first* span, and a wrapper span in front of the label would
+         swallow the swap. #}
+      <button type="submit" class="btn btn-primary"
+              data-busy-label="Wird angelegt…">{{ ui.icon("play") }}<i class="ico-done" aria-hidden="true">{{ ui.icon("check") }}</i><span>Suche starten</span></button>
+    </div>
+
   </div>
+  {# Was der Knopf dem Benutzer gerade gesagt hat, auch für Those, die ihn nicht
+     sehen. #}
+  <p class="visually-hidden" role="status" data-run-status></p>
 </form>
 
 {% if builder_enabled %}
