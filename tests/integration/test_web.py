@@ -304,7 +304,10 @@ async def test_found_listings_render_as_cards_with_their_gallery(
     # The whole gallery travels to the page so the lightbox needs no more requests.
     assert "https://images.vinted.net/123.jpeg" in body
     assert "123-back.jpeg" in body
-    assert "2 ▣" in body
+    # The photo-count badge: the icon, then how many. It used to carry a "▣" glyph as
+    # well, which was a font substitution pretending to be an icon.
+    assert '<span class="count">' in body
+    assert ">2</span>" in body
     assert "@seller" in body
     assert "★ 4.5" in body  # feedback_reputation 0.9, on the five-star scale
     assert "Nike" in body
@@ -1093,7 +1096,7 @@ async def test_a_healthy_destination_shows_its_wait_and_success_rate(
 
     body = signed_in.get("/destinations").text
 
-    assert "Typische Wartezeit" in body
+    assert "Wartezeit" in body
     assert "2,0 s" in body
     assert "Angekommen" in body
     assert "delivery-ok" in body

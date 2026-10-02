@@ -4,13 +4,12 @@
 {% block title %}Aktivität · vinted-sniper{% endblock %}
 {% block heading %}Aktivität{% endblock %}
 
-{% macro chart(series, label) -%}
+{% macro chart(series, label, peak) -%}
 {# Jeder Tag im Zeitraum wird gezeichnet, auch die leeren. Ein Balkendiagramm ohne die
    Nullen sieht ordentlicher aus und ist schlechter: Eine Suche, die früher zehn am Tag
    gefunden hat und heute keine, ist genau das, was diese Seite sichtbar machen soll. #}
 <div class="chart" role="img" aria-label="{{ label }}">
   {% for day, count in series %}
-  {% set peak = series | map(attribute=1) | max %}
   <div class="bar-col" title="{{ day }}: {{ count }}">
     <div class="bar {% if not count %}zero{% endif %}"
          style="height: {{ (100 * count / peak) | round | int if peak and count else 3 }}%"></div>
@@ -58,12 +57,20 @@
   </div>
   <div class="card card-pad chart-group">
     <div>
-      <span class="chart-label">Gefundene Artikel</span>
-      {{ chart(listings_series, "Gefundene Artikel pro Tag in den letzten 14 Tagen") }}
+      <div class="chart-head">
+        <span class="chart-label">Gefundene Artikel</span>
+        <span class="chart-peak">Höchstwert {{ '{:,}'.format(listings_series | map(attribute=1) | max) | replace(',', '.') }} an einem Tag</span>
+      </div>
+      {{ chart(listings_series, "Gefundene Artikel pro Tag in den letzten 14 Tagen",
+                listings_series | map(attribute=1) | max) }}
     </div>
     <div>
-      <span class="chart-label">Zugestellte Benachrichtigungen</span>
-      {{ chart(sent_series, "Zugestellte Benachrichtigungen pro Tag in den letzten 14 Tagen") }}
+      <div class="chart-head">
+        <span class="chart-label">Zugestellte Benachrichtigungen</span>
+        <span class="chart-peak">Höchstwert {{ '{:,}'.format(sent_series | map(attribute=1) | max) | replace(',', '.') }} an einem Tag</span>
+      </div>
+      {{ chart(sent_series, "Zugestellte Benachrichtigungen pro Tag in den letzten 14 Tagen",
+                sent_series | map(attribute=1) | max) }}
     </div>
   </div>
 </section>
@@ -81,7 +88,7 @@
     <table>
       <thead>
         <tr>
-          <th>Suche</th><th>Status</th><th>Gesehen</th><th>Blocksperren</th>
+          <th class="col-grow">Suche</th><th>Status</th><th>Gesehen</th><th>Blocksperren</th>
           <th>Rate-Limits</th><th>Ohne Treffer</th><th>Letzter Erfolg</th>
         </tr>
       </thead>
@@ -89,7 +96,7 @@
         {% for search in snapshot.searches %}
         {% set detail = states.get(search.query_id) %}
         <tr>
-          <td>
+          <td class="col-grow">
             <div class="cell-title">{{ search.name }}</div>
             <div class="cell-note">vinted.{{ search.tld }}</div>
           </td>
@@ -130,13 +137,13 @@
   {% else %}
   <div class="card table-wrap">
     <table>
-      <thead><tr><th>Wann</th><th>Suche</th><th>Was passiert ist</th></tr></thead>
+      <thead><tr><th>Wann</th><th>Suche</th><th class="col-grow">Was passiert ist</th></tr></thead>
       <tbody>
         {% for failure in recent_failures %}
         <tr>
           <td class="muted nowrap">{{ _age(failure.last_polled_at, now) }}</td>
           <td class="cell-title">{{ failure.query_name }}</td>
-          <td>
+          <td class="col-grow">
             <span class="pill failing plain">{{ failure.last_status }}</span>
             <span class="cell-note">{{ failure.last_error }}</span>
           </td>

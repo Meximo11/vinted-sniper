@@ -12,7 +12,7 @@
     <span class="photo-fallback" aria-hidden="true">{{ ui.icon("image") }}<span class="photo-fallback-text">Bild nicht verfügbar</span></span>
     <img src="{{ row.photos[0] }}" alt="" loading="lazy">
     {% if row.photos | length > 1 %}
-    <span class="count">{{ ui.icon("image") }}{{ row.photos | length }} ▣</span>
+    <span class="count">{{ ui.icon("image") }}{{ row.photos | length }}</span>
     {% endif %}
   </button>
   {% else %}

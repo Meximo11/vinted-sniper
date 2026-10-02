@@ -1,4 +1,4 @@
-<!doctype html>
+{% import "_icons.html" as ui %}<!doctype html>
 <html lang="de">
 <head>
   <meta charset="utf-8">
@@ -9,6 +9,12 @@
 </head>
 <body class="centered-page">
   <main class="notice-card">
+    {# The same mark the dashboard and the login screen open with. An error page that
+       forgets whose product it is looks like something else failed. #}
+    <div class="brand brand-centered">
+      <span class="mark">{{ ui.icon("target") }}</span>
+      <span>vinted-sniper</span>
+    </div>
     <p class="notice-code">{{ status_code }}</p>
     <h1>{{ message }}</h1>
     <p class="hint">

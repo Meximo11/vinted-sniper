@@ -84,10 +84,29 @@
   --r-lg: 8px;
   --r-pill: 999px;
 
-  /* --- Depth: hairlines do the work. Shadows only for what truly floats. --------- */
-  --shadow-pop: 0 1px 2px rgba(16, 21, 26, 0.06), 0 8px 24px rgba(16, 21, 26, 0.1);
+  /* --- Depth: three planes and no more --------------------------------------------
+   * Every shadow is tinted to the neutral it sits on rather than to black. A pure-black
+   * shadow on a cool grey reads as dirt on the surface; the same shadow tinted to the ink
+   * reads as the surface standing slightly proud of what is behind it.
+   *
+   * The rule for when a surface gets one: a hairline separates a panel, because a panel
+   * is not something you act on. Anything you can click, hover or scroll gets a resting
+   * elevation as well, because it has to say so before the pointer arrives. */
+  --elev-1: 0 1px 2px rgba(16, 21, 26, 0.045);
+  --elev-2: 0 1px 2px rgba(16, 21, 26, 0.05), 0 6px 16px rgba(16, 21, 26, 0.07);
+  --elev-3: 0 2px 6px rgba(16, 21, 26, 0.07), 0 18px 44px rgba(16, 21, 26, 0.13);
+
   --shadow-scrim: 0 0 0 100vmax rgba(12, 16, 20, 0.5);
-  --shadow-lightbox: 0 24px 64px rgba(12, 16, 20, 0.4);
+
+  /* --- Z-index: a documented scale, not numbers sprinkled where they were needed.
+   * The two that were previously arbitrary (39 and 40) sat either side of the topbar
+   * for no stated reason, which is exactly how a drawer ends up under the header. */
+  --z-topbar: 20;
+  --z-scrim: 30;
+  --z-drawer: 40;
+  --z-pop: 60;
+  --z-lightbox: 80;
+  --z-skip: 100;
 
   /* --- Focus: one ring, used everywhere ----------------------------------------- */
   --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
@@ -100,6 +119,25 @@
   --track-normal: -0.003em;
   --track-wide: 0.06em;
 
+  /* A scale, so two things that should be the same size are, and so the gap between
+     one step and the next is a decision rather than a habit. Seven steps, used
+     everywhere; anything needing an eighth is a sign the piece wants two sizes, not
+     nine. */
+  --t-figure: 2rem;
+  --t-title: 1.0625rem;
+  --t-section: 0.9375rem;
+  --t-body: 0.875rem;
+  --t-meta: 0.8125rem;
+  --t-small: 0.75rem;
+  --t-label: 0.6875rem;
+
+  /* One family, deliberately. This page has to open offline, behind a login, with no
+     build step, so a webfont would be one more request and one more failure mode; the
+     system stack is also what the reader already has tuned for their own screen. It is
+     not Inter, Roboto or Arial: it resolves to whatever the machine actually draws
+     with, which is the point. Numbers are the exception, and they are not a second
+     family either: tabular figures in the same sans, set one step tighter, so a column
+     of them is a ruled grid rather than a row of guesses. */
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
     Arial, sans-serif;
   --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Menlo, Consolas,
@@ -117,6 +155,10 @@
   --topbar-h: 3.5rem;
   --content-max: 104rem;
   --measure: 46rem;
+  /* The rhythm between sections. Named because it appears on every page and has to be the
+     same on all of them; a section that starts higher than the last one reads as a
+     mistake even when nobody can say what the mistake was. */
+  --section-gap: var(--s10);
 }
 
 :root[data-theme="dark"] {
@@ -147,9 +189,10 @@
   --bad-wash: rgba(239, 113, 134, 0.13);
   --info: #6aa6f0;
   --info-wash: rgba(106, 166, 240, 0.13);
-  --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.45);
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.34);
+  --elev-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 16px rgba(0, 0, 0, 0.42);
+  --elev-3: 0 2px 6px rgba(0, 0, 0, 0.4), 0 18px 44px rgba(0, 0, 0, 0.58);
   --shadow-scrim: 0 0 0 100vmax rgba(0, 0, 0, 0.62);
-  --shadow-lightbox: 0 24px 64px rgba(0, 0, 0, 0.6);
   --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
 }
 
@@ -183,9 +226,10 @@
     --bad-wash: rgba(239, 113, 134, 0.13);
     --info: #6aa6f0;
     --info-wash: rgba(106, 166, 240, 0.13);
-    --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.45);
+    --elev-1: 0 1px 2px rgba(0, 0, 0, 0.34);
+    --elev-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 16px rgba(0, 0, 0, 0.42);
+    --elev-3: 0 2px 6px rgba(0, 0, 0, 0.4), 0 18px 44px rgba(0, 0, 0, 0.58);
     --shadow-scrim: 0 0 0 100vmax rgba(0, 0, 0, 0.62);
-    --shadow-lightbox: 0 24px 64px rgba(0, 0, 0, 0.6);
     --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
   }
 }
@@ -197,6 +241,49 @@
   box-sizing: border-box;
 }
 
+/* The `hidden` attribute is how this interface hides things, and it loses. Any rule that
+   sets `display` outranks the user-agent's `[hidden] { display: none }`, because the
+   author sheet wins on specificity — so `.lightbox { display: grid }` silently pinned the
+   photo overlay open across every page that had one, under the whole interface. This one
+   line makes the attribute mean what it says everywhere, and it is the only place in the
+   stylesheet that uses !important: it has to outrank the author sheet to be worth having. */
+[hidden] {
+  display: none !important;
+}
+
+/* Scrollbars are part of the product, not the operating system's. There are four of them
+   on screen at any moment — the page, each table, the brand combobox, the option lists —
+   and the default one is a 15px grey slab that makes the panel look unfinished. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 0.625rem;
+  height: 0.625rem;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  background: var(--line-strong);
+  background-clip: content-box;
+  border-radius: var(--r-pill);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-3);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 html {
   -webkit-text-size-adjust: 100%;
 }
@@ -206,15 +293,19 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font);
-  font-size: 0.9375rem;
+  font-size: var(--t-body);
   line-height: 1.5;
   letter-spacing: var(--track-normal);
   -webkit-font-smoothing: antialiased;
-}
-
-/* Every number in the interface lines up in its column. */
-body {
+  /* Every number in the interface lines up in its column. */
   font-variant-numeric: tabular-nums;
+  /* Chrome and content are different planes, and they are told apart by edge as well as
+     by lightness: a 60px gradient down each scroll container, so the eye finds the
+     boundary of the page before it finds any content. Subtle enough to read as a
+     lighting difference rather than as a coloured panel. */
+  background-image: linear-gradient(180deg, var(--bg), var(--bg) 62px, transparent 180px);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }
 
 h1,
@@ -224,10 +315,16 @@ h3 {
   font-weight: 600;
   letter-spacing: var(--track-tight);
   line-height: 1.25;
+  /* A heading that wraps to one orphan word is a typesetting accident. Balancing is a
+     one-line fix that costs nothing and reads as someone having set it properly. */
+  text-wrap: balance;
 }
 
 p {
   margin: 0;
+  /* …and the same argument one step down: the last line of a paragraph should not be a
+     single short word stranded against the left edge. */
+  text-wrap: pretty;
 }
 
 a {
@@ -249,6 +346,9 @@ svg {
   flex: none;
 }
 
+/* One ring, everywhere, and it is drawn outside the element so it never shifts the
+   layout or clips against a neighbouring panel. The 2px inner ring in the token is the
+   page colour: without it the ring thins out wherever it crosses a rule. */
 :focus-visible {
   outline: none;
   box-shadow: var(--focus);
@@ -257,6 +357,7 @@ svg {
 
 ::selection {
   background: var(--accent-wash);
+  color: var(--ink);
 }
 
 .visually-hidden {
@@ -274,7 +375,7 @@ svg {
   position: absolute;
   top: var(--s2);
   left: var(--s2);
-  z-index: 100;
+  z-index: var(--z-skip);
   padding: var(--s2) var(--s4);
   background: var(--surface);
   border: 1px solid var(--line-strong);
@@ -349,8 +450,21 @@ svg {
   gap: var(--s6);
   height: 100dvh;
   padding: var(--s5) var(--s4);
-  background: var(--surface-2);
+  /* The rail recedes rather than presents itself: a gradient that lightens away from the
+     content edge, so the boundary between chrome and page is a change in light rather
+     than a rule you have to look for. */
+  background: linear-gradient(
+    100deg,
+    var(--surface-2) 0%,
+    var(--surface-2) 55%,
+    color-mix(in srgb, var(--bg) 55%, var(--surface-2)) 100%
+  );
   border-right: 1px solid var(--line);
+  /* The footer is pinned to the bottom by margin-top:auto, which means a long status
+     block plus a long nav pushes it off the screen with no way to reach it — the logout
+     button simply disappears on a short window. Let the rail scroll instead. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .brand {
@@ -398,10 +512,11 @@ svg {
   padding: var(--s2) var(--s3);
   border-radius: var(--r-sm);
   color: var(--ink-2);
-  font-size: 0.875rem;
+  font-size: var(--t-body);
   font-weight: 500;
   letter-spacing: var(--track-normal);
-  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+  transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease),
+    transform var(--t-fast) var(--ease);
 }
 
 .nav-link svg {
@@ -411,10 +526,19 @@ svg {
   transition: color var(--t-fast) var(--ease);
 }
 
+/* Two pixels. Enough that the row answers the pointer before the pointer arrives at it,
+   small enough that a run of five links does not look like a slot machine. */
 .nav-link:hover {
   background: var(--surface-3);
   color: var(--ink);
   text-decoration: none;
+  transform: translateX(2px);
+}
+
+/* …but the current page sits where it sits. Letting it drift on hover would suggest it
+   could move, which is the one thing a position indicator must never do. */
+.nav-link[aria-current="page"]:hover {
+  transform: none;
 }
 
 .nav-link:hover svg {
@@ -503,18 +627,34 @@ svg {
 .topbar {
   position: sticky;
   top: 0;
-  z-index: 20;
+  z-index: var(--z-topbar);
   display: flex;
   gap: var(--s4);
   align-items: center;
   min-height: var(--topbar-h);
   padding: var(--s3) var(--s6);
+  /* Opaque first, so a browser without color-mix gets a solid bar and never a hole.
+     The bar is the one element that sits over moving content, so it earns the only
+     backdrop filter in the interface — and it is sticky, never a scrolling container, so
+     the blur is composited once per frame on a fixed-size layer. */
   background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
   border-bottom: 1px solid var(--line);
 }
 
+@supports (backdrop-filter: blur(2px)) {
+  .topbar {
+    /* 85%, not less. A frosted bar over a photograph grid is the one place on this
+       page where the page title can end up on a dark image, and near-black text on a
+       dark photograph is not a contrast problem worth taking: the blur stays for the
+       depth, the opacity stays for the legibility. */
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    backdrop-filter: blur(16px) saturate(1.6);
+  }
+}
+
 .topbar h1 {
-  font-size: 1.0625rem;
+  font-size: var(--t-title);
   letter-spacing: var(--track-tightest);
 }
 
@@ -545,7 +685,7 @@ svg {
 }
 
 .content > section + section {
-  margin-top: var(--s8);
+  margin-top: var(--section-gap);
 }
 
 /* --- Section heads -----------------------------------------------------------------
@@ -571,17 +711,35 @@ svg {
   display: block;
   margin-bottom: var(--s2);
   color: var(--ink-3);
-  font-size: 0.6875rem;
+  font-size: var(--t-label);
   font-weight: 600;
   letter-spacing: var(--track-wide);
   text-transform: uppercase;
+}
+
+/* The form really is a sequence, so the groups are numbered — but the number is a
+   figure set in a sunken well rather than a character in the label. "1 · Wonach gesucht
+   wird" is a caption; this is an index on an instrument panel. */
+.group-label .step {
+  display: inline-grid;
+  place-items: center;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-right: var(--s2);
+  background: var(--sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  vertical-align: -0.1875rem;
 }
 
 .section-note {
   margin-top: var(--s4);
   max-width: var(--measure);
   color: var(--ink-3);
-  font-size: 0.8125rem;
+  font-size: var(--t-small);
   line-height: 1.6;
 }
 
@@ -627,15 +785,20 @@ svg {
   color: var(--accent-ink);
 }
 
-/* --- Panels -------------------------------------------------------------------------- */
+/* --- Panels --------------------------------------------------------------------------
+ * Hairline plus a quarter-step of elevation. The hairline is what draws the edge; the
+ * elevation is what stops the panel from looking like a hole cut in the page. At 4.5%
+ * alpha the second one is almost invisible on its own, which is the point: it is felt
+ * rather than seen, and the panels finally read as plates laid on a ground. */
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r);
+  box-shadow: var(--elev-1);
 }
 
 .card-pad {
-  padding: var(--s5);
+  padding: var(--s6);
 }
 
 .form-narrow {
@@ -653,7 +816,8 @@ svg {
   border: 1px solid var(--line);
   border-left: 2px solid var(--ok);
   border-radius: var(--r-sm);
-  font-size: 0.875rem;
+  box-shadow: var(--elev-1);
+  font-size: var(--t-body);
 }
 
 .statusbar.warn {
@@ -681,19 +845,21 @@ svg {
 
 .statusbar .nowrap {
   color: var(--ink-3);
-  font-size: 0.8125rem;
+  font-size: var(--t-meta);
 }
 
 /* --- Stat tiles ------------------------------------------------------------------------
  * Label, figure, context — in that order, always. The figure is the loudest thing in the
  * tile because it is the only thing anyone came for. */
 .stat-grid {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
+  /* Flex, not grid, and for a specific reason: the two pages that show this row have
+     four figures and five figures respectively. A fixed four-column grid parks the fifth
+     tile alone on a second row beside three empty cells — a large dead panel, drawn with
+     the line colour, that looks like something failed to load. Grid cannot express "as
+     many as fit, and never any empty ones"; wrapping flex items can. */
   gap: 1px;
-  /* Four figures, always — so the columns are counted, not inferred. auto-fit would
-     add a fifth track at tablet widths, collapse it to zero, and still draw its 1px
-     gap: a stray rule hanging off the right edge that lines up with nothing. */
-  grid-template-columns: repeat(4, minmax(0, 1fr));
   background: var(--line);
   border: 1px solid var(--line);
   border-radius: var(--r);
@@ -703,7 +869,10 @@ svg {
 /* The gap-and-background trick draws the grid as real hairlines rather than as borders
    on every tile, which is one rule instead of four. */
 .stat {
-  padding: var(--s4) var(--s5);
+  /* 12rem is the point at which "in den letzten 7 Tagen" stops wrapping. Below it the
+     tile wraps onto the next line rather than squeezing its own figure. */
+  flex: 1 1 12rem;
+  padding: var(--s5) var(--s6);
   background: var(--surface);
 }
 
@@ -712,7 +881,7 @@ svg {
   gap: var(--s2);
   align-items: center;
   color: var(--ink-3);
-  font-size: 0.6875rem;
+  font-size: var(--t-label);
   font-weight: 600;
   letter-spacing: var(--track-wide);
   text-transform: uppercase;
@@ -723,18 +892,23 @@ svg {
   height: 0.875rem;
 }
 
+/* The figure is the only thing anyone opened the page for, so it is the only thing on
+   it at display size. It is set one step tighter than the surrounding type and with the
+   tabular figures the body already declares: 4078 and 4 stand at the same width, so four
+   tiles read as one instrument panel instead of four unrelated numbers. */
 .stat .value {
   margin-top: var(--s2);
-  font-size: 1.75rem;
+  font-size: var(--t-figure);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   letter-spacing: var(--track-tightest);
-  line-height: 1.1;
+  line-height: 1.05;
 }
 
 .stat .hint {
-  margin-top: var(--s1);
+  margin-top: var(--s2);
   color: var(--ink-3);
-  font-size: 0.75rem;
+  font-size: var(--t-small);
 }
 
 .stat.tone-accent .value {
@@ -812,16 +986,28 @@ table {
   font-size: 0.875rem;
 }
 
+/* The header is a rail, not a row of words: it gets its own plane so the columns have a
+   fixed name above them even when you have scrolled half a list of listings past it. */
 thead th {
   padding: var(--s3) var(--s4);
+  background: var(--surface-2);
   border-bottom: 1px solid var(--line-strong);
   color: var(--ink-3);
-  font-size: 0.6875rem;
+  font-size: var(--t-label);
   font-weight: 600;
   letter-spacing: var(--track-wide);
   text-align: left;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+/* …and it has to end at the panel's own rounded corners, not at the page's. */
+thead th:first-child {
+  border-top-left-radius: var(--r);
+}
+
+thead th:last-child {
+  border-top-right-radius: var(--r);
 }
 
 tbody td {
@@ -832,6 +1018,23 @@ tbody td {
 
 tbody tr:last-child td {
   border-bottom: 0;
+}
+
+/* Every table here is mostly facts, and facts have widths. Letting the browser share
+   the leftover space evenly spreads a two-row table into a 400px gap between "Status"
+   and "Letzte Abfrage". So every column is asked to shrink to what it is actually
+   saying, and the one column that holds running text is marked `.col-grow` and takes
+   all the slack instead. */
+thead th,
+tbody td {
+  width: 1%;
+  white-space: nowrap;
+}
+
+thead th.col-grow,
+tbody td.col-grow {
+  width: auto;
+  white-space: normal;
 }
 
 tbody tr {
@@ -850,12 +1053,12 @@ tbody tr:hover {
 .cell-note {
   margin-top: 1px;
   color: var(--ink-3);
-  font-size: 0.8125rem;
+  font-size: var(--t-meta);
 }
 
 .disclosure-row td {
   padding: 0;
-  background: var(--surface-2);
+  background: var(--surface-3);
 }
 
 .disclosure-row .card-pad {
@@ -884,13 +1087,14 @@ tbody tr:hover {
   background: var(--surface);
   color: var(--ink);
   font-family: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--t-meta);
   font-weight: 500;
   letter-spacing: var(--track-normal);
   white-space: nowrap;
   cursor: pointer;
   transition: background-color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease),
-    color var(--t-fast) var(--ease), transform var(--t-press) var(--ease);
+    color var(--t-fast) var(--ease), transform var(--t-press) var(--ease),
+    box-shadow var(--t-fast) var(--ease);
 }
 
 .btn svg {
@@ -909,16 +1113,36 @@ tbody tr:hover {
   transform: scale(0.97);
 }
 
+/* The one filled control on the page, and the only one that is allowed to look like a
+   physical part. Three things make it read as machined rather than as a coloured
+   rectangle: a highlight along the top edge, as if the light is above it; a quarter-step
+   of elevation, so it sits on the panel rather than being printed into it; and a press
+   that travels further than the quiet buttons, because this is the action. */
 .btn-primary {
   background: var(--accent);
-  border-color: var(--accent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 94%, var(--accent-ink)) 0%,
+    var(--accent) 62%
+  );
+  border-color: color-mix(in srgb, var(--accent) 80%, var(--ink));
   color: var(--accent-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), var(--elev-1);
   font-weight: 600;
 }
 
 .btn-primary:hover {
   background: var(--accent-hover);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-hover) 94%, var(--accent-ink)) 0%,
+    var(--accent-hover) 62%
+  );
   border-color: var(--accent-hover);
+}
+
+.btn-primary:active {
+  transform: scale(0.975);
 }
 
 .btn-quiet {
@@ -947,7 +1171,7 @@ tbody tr:hover {
 .btn-sm {
   height: 1.75rem;
   padding: 0 var(--s2);
-  font-size: 0.75rem;
+  font-size: var(--t-small);
 }
 
 .btn-sm svg {
@@ -974,7 +1198,7 @@ tbody tr:hover {
 .field > label,
 .field > .label {
   color: var(--ink-2);
-  font-size: 0.75rem;
+  font-size: var(--t-small);
   font-weight: 600;
   letter-spacing: 0.01em;
 }
@@ -994,9 +1218,10 @@ textarea {
   border-radius: var(--r-xs);
   color: var(--ink);
   font-family: inherit;
-  font-size: 0.875rem;
+  font-size: var(--t-body);
   font-variant-numeric: tabular-nums;
-  transition: border-color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease);
+  transition: border-color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease),
+    box-shadow var(--t-fast) var(--ease);
 }
 
 select {
@@ -1038,7 +1263,7 @@ input::placeholder {
 
 .hint {
   color: var(--ink-3);
-  font-size: 0.75rem;
+  font-size: var(--t-small);
   line-height: 1.5;
 }
 
@@ -1098,9 +1323,19 @@ input::placeholder {
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   background: var(--surface);
-  font-size: 0.8125rem;
+  font-size: var(--t-meta);
   cursor: pointer;
-  transition: border-color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease);
+  transition: border-color var(--t-fast) var(--ease), background-color var(--t-fast) var(--ease),
+    transform var(--t-press) var(--ease), box-shadow var(--t-fast) var(--ease);
+}
+
+/* A checkbox is pressed, not clicked, and the difference is a millimetre of travel. */
+.check:active {
+  transform: scale(0.975);
+}
+
+.check:has(input:focus-visible) {
+  box-shadow: var(--focus);
 }
 
 .check:hover {
@@ -1221,14 +1456,14 @@ input[type="checkbox"] {
 
 .combo-list {
   position: fixed;
-  z-index: 60;
+  z-index: var(--z-pop);
   max-height: 16rem;
   overflow-y: auto;
   padding: var(--s1);
   background: var(--surface);
   border: 1px solid var(--line-strong);
   border-radius: var(--r-sm);
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--elev-3);
 }
 
 .combo-list [role="option"] {
@@ -1257,7 +1492,8 @@ input[type="checkbox"] {
   border-left-width: 2px;
   border-radius: var(--r-sm);
   background: var(--surface);
-  font-size: 0.875rem;
+  box-shadow: var(--elev-1);
+  font-size: var(--t-body);
 }
 
 .flash svg {
@@ -1303,7 +1539,7 @@ input[type="checkbox"] {
 .attention-row .when {
   margin-left: auto;
   color: var(--ink-3);
-  font-size: 0.75rem;
+  font-size: var(--t-small);
 }
 
 /* --- Empty states -------------------------------------------------------------------------------------
@@ -1326,13 +1562,13 @@ input[type="checkbox"] {
 }
 
 .empty h3 {
-  font-size: 0.9375rem;
+  font-size: var(--t-section);
 }
 
 .empty p {
   max-width: 32rem;
   color: var(--ink-3);
-  font-size: 0.8125rem;
+  font-size: var(--t-small);
   line-height: 1.6;
 }
 
@@ -1357,12 +1593,25 @@ input[type="checkbox"] {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r);
+  box-shadow: var(--elev-1);
   overflow: hidden;
-  transition: border-color var(--t-base) var(--ease);
+  transition: border-color var(--t-base) var(--ease), box-shadow var(--t-base) var(--ease),
+    transform var(--t-base) var(--ease);
 }
 
+/* The one place in the interface where a hover does something structural rather than
+   only recolouring. Two millimetres of lift and a step of elevation is what a card of
+   photographs should do under the pointer — it separates from the grid it sits in, so
+   the row you are reading is the row you are pointing at. Everything animates on
+   transform and box-shadow only; nothing here reflows the grid. */
 .listing:hover {
   border-color: var(--line-strong);
+  box-shadow: var(--elev-2);
+  transform: translateY(-2px);
+}
+
+.listing:active {
+  transform: translateY(0);
 }
 
 .listing .photo,
@@ -1395,19 +1644,21 @@ input[type="checkbox"] {
   right: var(--s2);
   display: inline-flex;
   align-items: center;
-  gap: 0.125rem;
+  gap: 0.1875rem;
   padding: 0 var(--s2);
   background: rgba(12, 16, 20, 0.72);
   color: #fff;
-  border-radius: var(--r-xs);
-  font-size: 0.6875rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--r-pill);
+  font-size: var(--t-label);
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
   line-height: 1.375rem;
 }
 
 .listing .photo .count svg {
-  width: 0.6875rem;
-  height: 0.6875rem;
+  width: 0.75rem;
+  height: 0.75rem;
 }
 
 /* What a photo area shows when there is no picture to show, whether the listing never had
@@ -1435,7 +1686,7 @@ input[type="checkbox"] {
 
 .photo-fallback-text {
   max-width: 8rem;
-  font-size: 0.6875rem;
+  font-size: var(--t-label);
   line-height: 1.35;
 }
 
@@ -1467,7 +1718,7 @@ input[type="checkbox"] {
   -webkit-line-clamp: 2;
   min-height: 2.5rem;
   color: var(--ink);
-  font-size: 0.8125rem;
+  font-size: var(--t-meta);
   font-weight: 500;
   line-height: 1.4;
   letter-spacing: var(--track-normal);
@@ -1486,15 +1737,18 @@ input[type="checkbox"] {
   align-items: baseline;
 }
 
+/* Price is the answer the card was clicked for, so it is the second loudest thing on it
+   after the photograph, and the only figure set in the display cut. */
 .listing .price strong {
-  font-size: 0.9375rem;
+  font-size: 1.125rem;
   font-weight: 600;
-  letter-spacing: var(--track-tight);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--track-tightest);
 }
 
 .listing .price .total {
   color: var(--ink-3);
-  font-size: 0.75rem;
+  font-size: var(--t-small);
 }
 
 .listing .tags {
@@ -1508,7 +1762,7 @@ input[type="checkbox"] {
   border: 1px solid var(--line);
   border-radius: var(--r-xs);
   color: var(--ink-2);
-  font-size: 0.6875rem;
+  font-size: var(--t-label);
   line-height: 1.5rem;
   white-space: nowrap;
 }
@@ -1523,7 +1777,7 @@ input[type="checkbox"] {
   flex-wrap: wrap;
   gap: var(--s2);
   color: var(--ink-3);
-  font-size: 0.75rem;
+  font-size: var(--t-small);
 }
 
 .listing .meta a {
@@ -1571,18 +1825,34 @@ input[type="checkbox"] {
    day and now finds none is the exact thing this page exists to make visible. */
 .chart-group {
   display: grid;
-  gap: var(--s6);
+  gap: var(--s8);
   grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+}
+
+/* The label carries the scale. A bar chart without a number on it is a picture; the
+   peak is the only figure that turns it back into a reading, and it costs two words. */
+.chart-head {
+  display: flex;
+  gap: var(--s3);
+  align-items: baseline;
+  margin-bottom: var(--s4);
 }
 
 .chart-label {
   display: block;
-  margin-bottom: var(--s3);
   color: var(--ink-3);
-  font-size: 0.6875rem;
+  font-size: var(--t-label);
   font-weight: 600;
   letter-spacing: var(--track-wide);
   text-transform: uppercase;
+}
+
+.chart-peak {
+  margin-left: auto;
+  color: var(--ink-2);
+  font-size: var(--t-small);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .chart {
@@ -1591,7 +1861,9 @@ input[type="checkbox"] {
   align-items: flex-end;
   height: 7rem;
   padding-bottom: var(--s3);
-  border-bottom: 1px solid var(--line);
+  /* The baseline is the value axis, so it is drawn at full strength while everything
+     above it stays hairline. Without it the bars float and the chart has no floor. */
+  border-bottom: 1px solid var(--line-strong);
 }
 
 .bar-col {
@@ -1600,13 +1872,27 @@ input[type="checkbox"] {
   flex-direction: column;
   justify-content: flex-end;
   height: 100%;
+  border-radius: var(--r-xs) var(--r-xs) 0 0;
   text-align: center;
+  transition: background-color var(--t-fast) var(--ease);
+}
+
+/* Pointing at a bar answers with the day under it, without a tooltip and without a
+   layout shift: the column behind it takes a wash, so the value in the title attribute
+   has something to point at. */
+.bar-col:hover {
+  background: var(--surface-2);
 }
 
 .bar {
   min-height: 2px;
-  background: var(--accent);
+  background: linear-gradient(
+    180deg,
+    var(--accent) 0%,
+    color-mix(in srgb, var(--accent) 62%, var(--surface)) 100%
+  );
   border-radius: var(--r-xs) var(--r-xs) 0 0;
+  transform-origin: bottom;
 }
 
 .bar.zero {
@@ -1634,6 +1920,13 @@ input[type="checkbox"] {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r);
+  box-shadow: var(--elev-1);
+  transition: box-shadow var(--t-base) var(--ease), border-color var(--t-base) var(--ease);
+}
+
+.dest:hover {
+  border-color: var(--line-strong);
+  box-shadow: var(--elev-2);
 }
 
 .dest.off {
@@ -1647,7 +1940,7 @@ input[type="checkbox"] {
 }
 
 .dest-head h3 {
-  font-size: 0.875rem;
+  font-size: var(--t-body);
 }
 
 .dest-icon {
@@ -1668,7 +1961,7 @@ input[type="checkbox"] {
 
 .kind-label {
   color: var(--ink-3);
-  font-size: 0.75rem;
+  font-size: var(--t-small);
   text-transform: capitalize;
 }
 
@@ -1682,13 +1975,13 @@ input[type="checkbox"] {
   border-radius: var(--r-xs);
   color: var(--ink-2);
   font-family: var(--mono);
-  font-size: 0.75rem;
+  font-size: var(--t-small);
   word-break: break-all;
 }
 
 .reason {
   color: var(--bad);
-  font-size: 0.8125rem;
+  font-size: var(--t-meta);
 }
 
 .delivery {
@@ -1702,7 +1995,7 @@ input[type="checkbox"] {
 
 .delivery dt {
   color: var(--ink-3);
-  font-size: 0.6875rem;
+  font-size: var(--t-label);
   font-weight: 600;
   letter-spacing: var(--track-wide);
   text-transform: uppercase;
@@ -1710,8 +2003,9 @@ input[type="checkbox"] {
 
 .delivery dd {
   margin: 2px 0 0;
-  font-size: 0.875rem;
+  font-size: var(--t-body);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .delivery-bad dd {
@@ -1728,7 +2022,7 @@ input[type="checkbox"] {
 
 .delivery-note {
   color: var(--ink-3);
-  font-size: 0.8125rem;
+  font-size: var(--t-meta);
   line-height: 1.6;
 }
 
@@ -1751,12 +2045,14 @@ input[type="checkbox"] {
 .pager .gap {
   padding: 0 var(--s1);
   color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
 }
 
 .pager .is-current {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
   font-weight: 600;
 }
 
@@ -1764,7 +2060,7 @@ input[type="checkbox"] {
 .lightbox {
   position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: var(--z-lightbox);
   display: grid;
   place-items: center;
   padding: var(--s8);
@@ -1777,6 +2073,9 @@ input[type="checkbox"] {
   max-height: 82vh;
   object-fit: contain;
   border-radius: var(--r);
+  /* The photograph is the subject; it gets the one real shadow in the interface, plus
+     a hairline so a white garment still has an edge against the scrim. */
+  box-shadow: var(--elev-3);
 }
 
 /* Arrives from just inside its final size. Never from scale(0), which reads as coming
@@ -1810,22 +2109,35 @@ input[type="checkbox"] {
   position: absolute;
   display: grid;
   place-items: center;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2.75rem;
+  height: 2.75rem;
   background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: var(--r-sm);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--r-pill);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
   color: #fff;
-  font-size: 1.375rem;
+  font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
-  transition: background-color var(--t-fast) var(--ease);
+  /* Fixed overlay controls, which is one of the two places a backdrop filter is allowed
+     (the other is the sticky top bar). The hit area stays the same size either way. */
+  backdrop-filter: blur(6px);
+  transition: background-color var(--t-fast) var(--ease), scale var(--t-press) var(--ease);
 }
 
 .lb-close:hover,
 .lb-prev:hover,
 .lb-next:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* `scale`, not `transform`: the arrow buttons are centred with translateY(-50%), and
+   writing to transform here would drop that offset and throw them 1.4rem down the
+   screen on every press. The individual properties compose instead of overwriting. */
+.lb-close:active,
+.lb-prev:active,
+.lb-next:active {
+  scale: 0.94;
 }
 
 .lb-close {
@@ -1851,9 +2163,12 @@ input[type="checkbox"] {
   left: 50%;
   padding: var(--s1) var(--s3);
   background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: var(--r-pill);
   color: #fff;
-  font-size: 0.75rem;
+  font-size: var(--t-small);
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(6px);
   transform: translateX(-50%);
 }
 
@@ -1865,25 +2180,30 @@ input[type="checkbox"] {
   padding: var(--s6);
 }
 
+/* The login and error pages are the only screens a person sees before they are in, so
+   they get more air and more elevation than anything inside the app: this panel is the
+   first and last impression the product makes. */
 .notice-card {
   display: flex;
   flex-direction: column;
-  gap: var(--s4);
-  width: min(100%, 24rem);
-  padding: var(--s8);
+  gap: var(--s5);
+  width: min(100%, 25rem);
+  padding: var(--s10);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
+  box-shadow: var(--elev-2);
 }
 
 .notice-card h1 {
-  font-size: 1.125rem;
+  font-size: 1.375rem;
+  letter-spacing: var(--track-tightest);
 }
 
 .brand-centered {
   padding: 0;
   margin-bottom: var(--s2);
-  font-size: 1rem;
+  font-size: 1.0625rem;
 }
 
 .login-form {
@@ -1893,8 +2213,9 @@ input[type="checkbox"] {
 
 .notice-code {
   color: var(--ink-3);
-  font-size: 2.5rem;
+  font-size: 3rem;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   letter-spacing: var(--track-tightest);
   line-height: 1;
 }
@@ -1919,14 +2240,14 @@ input[type="checkbox"] {
   .nav-scrim {
     position: fixed;
     inset: 0;
-    z-index: 39;
+    z-index: var(--z-scrim);
     background: var(--shadow-scrim);
   }
 
   .sidebar {
     position: fixed;
     inset: 0 auto 0 0;
-    z-index: 40;
+    z-index: var(--z-drawer);
     width: var(--sidebar-w);
     transform: translateX(-100%);
     transition: transform var(--t-base) var(--settle);
@@ -1934,7 +2255,7 @@ input[type="checkbox"] {
 
   .sidebar.open {
     transform: none;
-    box-shadow: var(--shadow-pop);
+    box-shadow: var(--elev-3);
   }
 
   .content {
@@ -1949,8 +2270,8 @@ input[type="checkbox"] {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .stat-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .stat {
+    flex-basis: 10rem;
   }
 }
 
@@ -1958,6 +2279,15 @@ input[type="checkbox"] {
   .listing-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--s3);
+  }
+
+  /* Two lines of reserved title height in a 168px card is a hole in the middle of
+     every card, and on a phone the price is what you are scanning for. The cards are
+     grid items, so they still stretch to a common height and the provenance row still
+     pins to the bottom — losing the reservation costs alignment between a row of two,
+     which costs far less than losing the listing itself below the fold. */
+  .listing .title {
+    min-height: 0;
   }
 
   .form-grid {
@@ -1975,10 +2305,102 @@ input[type="checkbox"] {
   .row-actions {
     flex-wrap: wrap;
   }
+
+  /* Three stacked controls put half a screen of chrome above the first result. The
+     text field still needs the whole width; the select and the button are both
+     comfortable at half. */
+  .filters {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .filters > .field:first-child {
+    grid-column: 1 / -1;
+  }
+
+  /* Both of these put a short timestamp on the right of a sentence. Side by side on a
+     390px screen that sentence gets 150px and wraps to four lines while "vor 9 Min."
+     wraps to three of its own. Stacked, each gets the full width and neither wraps. */
+  .statusbar,
+  .attention-row {
+    flex-wrap: wrap;
+  }
+
+  .statusbar .spacer {
+    display: none;
+  }
+
+  .statusbar .nowrap,
+  .attention-row .when {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .attention-row .when {
+    /* Aligned under the text, not under the alert glyph. */
+    padding-left: 1.75rem;
+  }
 }
 
 /* --- Preferences the system already understands -------------------------------------------------------------------
  * Both change the material and the motion, not just the animation. */
+/* --- Motion ----------------------------------------------------------------------------
+ * Everything below runs once, on load, and answers something. There are no scroll
+ * reveals on this page and there never will be: it is a list of figures somebody reads
+ * dozens of times a day, and a chart that fades in every time it scrolls past the fold
+ * is motion that carries no information. One moment on arrival, one moment on the bars
+ * drawing themselves, and then the interface holds still. */
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The arrival. Six pixels and a fade, on the whole page, once. Starting from just
+     below its final position means the interface looks like it is being set down on the
+     table rather than switched on. */
+  .main {
+    animation: page-in 380ms var(--settle) both;
+  }
+
+  /* The bars. Growing from the baseline rather than fading in, because a bar chart is
+     the one place where the direction of travel is the meaning: these are counts
+     accumulating on a day, not boxes appearing. */
+  .bar {
+    animation: bar-grow 520ms var(--settle) both;
+  }
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes bar-grow {
+  from {
+    transform: scaleY(0.02);
+  }
+}
+
+/* Switching theme is the one transition in the interface that is not about a state the
+   person touched a control for — it is the whole ground changing underneath them. Left
+   instantaneous it snaps; left to the global transition below it would drag every hover
+   state along with it. So it gets its own moment, on the html element, applied only for
+   as long as the switch takes. `.theme-changing` is added and removed by the theme code. */
+:root.theme-changing,
+:root.theme-changing body,
+:root.theme-changing .card,
+:root.theme-changing .stat,
+:root.theme-changing .listing,
+:root.theme-changing .dest,
+:root.theme-changing .sidebar,
+:root.theme-changing .topbar,
+:root.theme-changing .btn,
+:root.theme-changing .nav-link,
+:root.theme-changing .pill,
+:root.theme-changing input,
+:root.theme-changing select {
+  transition: background-color 320ms var(--ease), border-color 320ms var(--ease),
+    color 320ms var(--ease), box-shadow 320ms var(--ease) !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1989,6 +2411,10 @@ input[type="checkbox"] {
   }
 
   .btn:active {
+    transform: none;
+  }
+
+  .listing:active {
     transform: none;
   }
 }

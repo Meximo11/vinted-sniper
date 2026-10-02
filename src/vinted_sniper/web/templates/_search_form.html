@@ -6,7 +6,7 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
   {# --- Schritt 1: die Suche beschreiben ---------------------------------------- #}
-  <span class="group-label">1 · Wonach gesucht wird</span>
+  <span class="group-label"><span class="step">1</span>Wonach gesucht wird</span>
 
   <div class="url-row">
     <input type="url" id="url" name="url" required
@@ -87,7 +87,7 @@
   {% endif %}
 
   {# --- Schritt 2: wohin damit, und wie oft ------------------------------------ #}
-  <span class="group-label mt-md">2 · Wohin und wie oft</span>
+  <span class="group-label mt-md"><span class="step">2</span>Wohin und wie oft</span>
 
   <div class="form-grid mt-sm">
     <div class="field">

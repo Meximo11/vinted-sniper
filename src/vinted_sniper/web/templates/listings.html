@@ -10,7 +10,7 @@
 {% if filter_text or filter_query %}
   <div class="flash flash-ok" role="status">
     {{ ui.icon("search") }}<span>
-      {{ total }} Artikel{{ '' if total == 1 else ' passen' }} zu diesem Filter.
+      {{ '{:,}'.format(total) | replace(',', '.') }} Artikel{{ '' if total == 1 else ' passen' }} zu diesem Filter.
     </span>
   </div>
 {% endif %}
@@ -48,7 +48,7 @@
   {% endif %}
 {% else %}
   <div class="section-head">
-    <h2>{{ total }} Artikel gefunden</h2>
+    <h2>{{ '{:,}'.format(total) | replace(',', '.') }} Artikel gefunden</h2>
     <div class="spacer"></div>
     <span class="hint">Seite {{ page }} von {{ pages }}</span>
   </div>

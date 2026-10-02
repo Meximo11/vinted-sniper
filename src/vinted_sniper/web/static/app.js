@@ -160,12 +160,30 @@
     }
   };
 
+  // Switching theme changes the entire ground under the page at once, which is not a
+  // state the person hovered or pressed. Given the stylesheet's normal transitions it
+  // would snap; given a blanket transition it would drag every hover state along with
+  // it. So it gets its own 320ms window: add a class, let the CSS swap every colour at
+  // once, take it off again. No timer survives a theme change started twice.
+  let themeTimer = null;
+  // Suppressed on the very first application: the inline script in the document head
+  // has already set the attribute before the first paint, so there is nothing to
+  // animate and putting a class on <html> would only cost a style recalculation.
+  let booted = false;
+  const crossfade = () => {
+    if (reduced || !booted) return;
+    root.classList.add("theme-changing");
+    window.clearTimeout(themeTimer);
+    themeTimer = window.setTimeout(() => root.classList.remove("theme-changing"), 340);
+  };
+
   const applyTheme = (choice) => {
     if (choice === "light" || choice === "dark") {
       root.setAttribute("data-theme", choice);
     } else {
       root.removeAttribute("data-theme");
     }
+    crossfade();
     for (const option of options) {
       option.setAttribute("aria-pressed", String(option.dataset.themeChoice === choice));
     }
@@ -180,6 +198,7 @@
   else systemDark.addListener(followSystem);
 
   applyTheme(readTheme());
+  booted = true;
   for (const option of options) {
     option.addEventListener("click", () => {
       const choice = option.dataset.themeChoice;

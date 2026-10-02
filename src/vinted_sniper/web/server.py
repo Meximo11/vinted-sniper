@@ -133,6 +133,27 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
     token = settings.web_auth_token  # None means no password: the dashboard just opens
 
     app = FastAPI(title="vinted-sniper", docs_url=None, redoc_url=None)
+
+    @app.middleware("http")
+    async def static_files_revalidate(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        """Make the browser ask about the stylesheet and the scripts every time.
+
+        Without this the response carries no Cache-Control, so a browser is free to
+        apply heuristic freshness — roughly a tenth of the time since Last-Modified —
+        and serve an old stylesheet without asking. On a tool that people run locally
+        and restyle, that means editing app.css, pressing reload, and still seeing the
+        interface you changed ten minutes ago. `no-cache` does not forbid caching, it
+        forbids *using* it without asking; the ETag is still there, so an unchanged file
+        costs one 304 and no body.
+        """
+        if request.url.path.startswith("/static/"):
+            response = await call_next(request)
+            response.headers["Cache-Control"] = "no-cache"
+            return response
+        return await call_next(request)
+
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
     # Templates ask for "how long ago" constantly, and always against the same instant,
     # so the two are passed together rather than each view re-deriving the clock.

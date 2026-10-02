@@ -27,7 +27,7 @@
     <table>
       <thead>
         <tr>
-          <th>Suche</th>
+          <th class="col-grow">Suche</th>
           <th>Status</th>
           <th>Letzte Abfrage</th>
           <th>Neuester Treffer</th>
@@ -39,13 +39,13 @@
         {% for search in snapshot.searches %}
         {% set routes = routes_by_query.get(search.query_id, []) %}
         <tr>
-          <td>
+          <td class="col-grow">
             <div class="cell-title">{{ search.name }}</div>
             <div class="cell-note">
               vinted.{{ search.tld }}{% if routes %}, {{ routes | length }} Empfänger{% endif %}
             </div>
             {% if search.last_error %}
-            <div class="cell-note text-bad">{{ search.last_error[:90] }}</div>
+            <div class="cell-note text-bad">{{ search.last_error[:90] }}{% if search.last_error | length > 90 %}…{% endif %}</div>
             {% endif %}
           </td>
           <td><span class="pill {{ search.state }}">{{ search.state_label or search.state }}</span></td>
