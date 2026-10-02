@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
+  {# Matches --bg in each theme, so the browser chrome around the page is part of it
+     rather than a white band above a dark app. #}
+  <meta name="theme-color" content="#f4f6f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0c1013" media="(prefers-color-scheme: dark)">
   <title>{% block title %}vinted-sniper{% endblock %}</title>
   {# Läuft vor dem Stylesheet, damit die Seite nie im falschen Thema erscheint und einen
      Bildschirm später in das richtige springt. Bewusst inline: ein externes Skript ist
