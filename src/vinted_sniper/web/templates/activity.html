@@ -101,26 +101,25 @@
         <div class="event-body">
           <div class="event-head">
             {% if event.count > 1 %}<span class="event-count">{{ event.count }}×</span>{% endif %}
-            <span class="event-outcome">
-              {%- if event.kind == 'gefunden' -%}gefunden
-              {%- elif event.kind == 'zugestellt' -%}zugestellt
-              {%- else -%}{{ event.status }}{%- endif -%}
-            </span>
+            <span class="event-outcome">{{ event.outcome }}</span>
             {% if event.href %}
             <a class="event-what" href="{{ event.href }}" target="_blank" rel="noreferrer">{{ event.headline }}</a>
             {% else %}
             <span class="event-what">{{ event.headline }}</span>
             {% endif %}
-            {% if event.money %}<span class="event-money">{{ event.money }}</span>{% endif %}
+            {% if event.money and event.count == 1 %}<span class="event-money">{{ event.money }}</span>{% endif %}
           </div>
-          {% if event.sub %}<p class="event-sub">{{ event.sub }}</p>{% endif %}
+          {# A collapsed run stands for many items, so it cannot name one of them.
+             The count is the whole content; the first item's title would be a
+             detail that describes 1 of 40, which is worse than saying nothing. #}
+          {% if event.sub and event.count == 1 %}<p class="event-sub">{{ event.sub }}</p>{% endif %}
           <p class="event-meta">
             <span>{{ event.when }}</span>
             {% if event.query_name %}
             <span class="event-dot" aria-hidden="true">·</span>
             <span>{{ event.query_name }}</span>
             {% endif %}
-            {% if event.retries %}
+            {% if event.attempts > 1 %}
             <span class="event-dot" aria-hidden="true">·</span>
             <span>{{ event.attempts }} Versuche</span>
             {% endif %}
@@ -195,4 +194,4 @@
   {% endif %}
 </section>
 
-{% endblock %}
+{% endblock %}

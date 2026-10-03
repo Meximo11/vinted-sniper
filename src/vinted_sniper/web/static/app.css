@@ -66,7 +66,6 @@
      darker sibling does it at 4.65:1 on the same wash. */
   --live-deep: #9c6210;
   --live-wash: #fff5e0;
-  --live-edge: color-mix(in srgb, var(--live) 62%, transparent);
 
   /* Semantics. Quiet by design: a problem should read as information, not as
      an alarm that competes with the photographs. */
@@ -126,10 +125,6 @@
   --dur-slow: 260ms;
   --ease: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
-
-  /* The freshness window, mirrored from the server so the stylesheet can draw
-     the decay without a second source of truth drifting into it. */
-  --fresh-cap: 900;
 }
 
 [data-theme="dark"] {
@@ -153,7 +148,6 @@
   --live: #f0bd5c;
   --live-deep: #d99a2e;
   --live-wash: #2a2216;
-  --live-edge: color-mix(in srgb, var(--live) 50%, transparent);
 
   --bad: #e08a72;
   --bad-wash: #2a1c18;
@@ -188,7 +182,6 @@
     --live: #f0bd5c;
     --live-deep: #d99a2e;
     --live-wash: #2a2216;
-    --live-edge: color-mix(in srgb, var(--live) 50%, transparent);
 
     --bad: #e08a72;
     --bad-wash: #2a1c18;
@@ -557,9 +550,6 @@ textarea {
   width: 100%;
   max-width: 84rem;
   padding: var(--s6) clamp(var(--s4), 3vw, var(--s7)) var(--s8);
-  /* View transitions: the content cross-fades between pages, which reads as one
-     app changing screens rather than five documents loading. */
-  view-transition-name: content;
 }
 
 .menu-toggle {
@@ -659,11 +649,6 @@ textarea {
   font-size: var(--t-label);
 }
 
-.btn-icon {
-  padding: 0;
-  width: 2.25rem;
-}
-
 .btn:disabled,
 .btn[aria-disabled="true"] {
   opacity: 0.45;
@@ -724,40 +709,6 @@ textarea {
   to {
     transform: rotate(1turn);
   }
-}
-
-/* A switch. One destination, one on/off, no words needed. */
-.switch {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  width: 2.25rem;
-  height: 1.375rem;
-  padding: 0;
-  border: 0;
-  border-radius: var(--r-pill);
-  background: var(--surface-3);
-  cursor: pointer;
-  transition: background-color var(--dur) var(--ease);
-}
-
-.switch::after {
-  content: "";
-  width: 1.125rem;
-  height: 1.125rem;
-  margin-left: 0.125rem;
-  border-radius: var(--r-pill);
-  background: var(--surface);
-  box-shadow: var(--lift-1);
-  transition: transform var(--dur) var(--ease);
-}
-
-.switch[aria-checked="true"] {
-  background: var(--ink-1);
-}
-
-.switch[aria-checked="true"]::after {
-  transform: translateX(0.875rem);
 }
 
 /* -----------------------------------------------------------------------------
@@ -920,14 +871,6 @@ select {
   height: 1rem;
   margin: 0;
   accent-color: var(--ink-1);
-}
-
-.field-error {
-  display: flex;
-  gap: var(--s2);
-  align-items: flex-start;
-  color: var(--bad);
-  font-size: var(--t-label);
 }
 
 /* The disclosure head. It is a button wearing a heading's clothes, so it needs
@@ -1504,13 +1447,6 @@ select {
   line-height: 1.6;
 }
 
-.lede {
-  max-width: 60ch;
-  color: var(--ink-2);
-  font-size: var(--t-lead);
-  line-height: 1.5;
-}
-
 /* The "receipt" line. The overview's answer to "what did I catch?" is a
    sentence with two numbers in it, set typographically — not four cards in a
    row, which is what the previous layout did and what the brief rules out. */
@@ -1616,15 +1552,6 @@ select {
   color: var(--ink-3);
   font-size: var(--t-label);
   font-variant-numeric: tabular-nums;
-}
-
-.allclear {
-  display: flex;
-  gap: var(--s2);
-  align-items: center;
-  color: var(--good);
-  font-size: var(--t-body);
-  font-weight: 560;
 }
 
 /* -----------------------------------------------------------------------------
@@ -1879,41 +1806,14 @@ a.event-what:hover {
 
 /* -----------------------------------------------------------------------------
    9 · Charts
-   Each series is scaled to itself and says so. The previous version drew two
-   charts at the same pixel height with no axis, so "2.923" and "7.220" looked
-   like the same amount of activity — which is the specific kind of lie a chart
-   exists to prevent.
+   One chart, two series, one scale shared by both. The first version of this page
+   drew two charts at the same pixel height with no axis, so "2.923" and "7.220"
+   looked like the same amount of activity; the second gave each chart its own
+   scale and its own stated maximum, which was honest but still left two pictures
+   that could not be compared by eye. Founds and deliveries are the same kind of
+   thing counted — one of something — so they belong on one axis, where the only
+   question worth asking here is answerable: are the notifications keeping up?
    -------------------------------------------------------------------------- */
-
-.chart-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s6);
-}
-
-.chart-block {
-  display: flex;
-  flex-direction: column;
-  gap: var(--s3);
-}
-
-.chart-head {
-  display: flex;
-  gap: var(--s4);
-  align-items: baseline;
-  justify-content: space-between;
-}
-
-.chart-label {
-  font-size: var(--t-body);
-  font-weight: 560;
-}
-
-.chart-peak {
-  color: var(--ink-3);
-  font-size: var(--t-label);
-  font-variant-numeric: tabular-nums;
-}
 
 .chart {
   display: grid;
@@ -1960,8 +1860,6 @@ a.event-what:hover {
 /* The scale, stated rather than implied. One labelled maximum per chart is
    enough to make the bars honest without turning the page into a spreadsheet. */
 .chart-scale {
-  display: flex;
-  justify-content: flex-end;
   color: var(--ink-3);
   font-size: var(--t-micro);
   font-variant-numeric: tabular-nums;
@@ -1981,6 +1879,13 @@ a.event-what:hover {
   gap: 2px;
   align-items: flex-end;
   height: 100%;
+}
+
+/* An empty div in a row flex has no content and therefore no width — the bars
+   need to be told to share the column, or they render at zero pixels. As
+   children of the old column flex they had been stretched for free. */
+.bars > .bar {
+  flex: 1;
 }
 
 .bar.is-sent {
@@ -2530,18 +2435,9 @@ kbd {
 /* -----------------------------------------------------------------------------
    13 · Motion
    Everything above is static by default. This block is the whole animation
-   budget: three transitions that answer something the user did, one sweep for
-   an arrival, and a cross-fade between pages. Nothing loops, nothing parallaxes,
-   nothing fades up on scroll.
+   budget: three transitions that answer something the user did, and one sweep
+   for an arrival. Nothing loops, nothing parallaxes, nothing fades up on scroll.
    -------------------------------------------------------------------------- */
-
-@media (prefers-reduced-motion: no-preference) {
-  ::view-transition-old(content),
-  ::view-transition-new(content) {
-    animation-duration: 140ms;
-    animation-timing-function: var(--ease);
-  }
-}
 
 @media (prefers-reduced-motion: reduce) {
   *,

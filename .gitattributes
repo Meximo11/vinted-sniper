@@ -1,0 +1,6 @@
+# Check text files in and out as LF in the repository, and convert to the
+# platform's native ending on checkout. Without this the store format depends on
+# whichever machine happened to commit a file: activity.html was committed with
+# CRLF in the blob while every other file was LF, so its diff showed all 197
+# lines as rewritten when only 9 had actually changed.
+* text=auto

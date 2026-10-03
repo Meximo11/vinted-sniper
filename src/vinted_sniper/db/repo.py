@@ -744,6 +744,50 @@ class Repo:
         value = await self._db.fetch_value("SELECT MAX(last_success_at) FROM query_state")
         return int(value) if value is not None else None
 
+    async def recent_events(self, *, limit: int = 40, days: int = 30) -> list[aiosqlite.Row]:
+        """What actually happened, newest first, as one list rather than three.
+
+        This page used to answer "how is the system doing", which is a different
+        question from "what happened", and the two need different tables: a
+        question about the past wants its answers in the order they occurred.
+
+        Three kinds of thing really happen here — a listing is found, a
+        notification is delivered, a check fails — and each one has a real
+        timestamp to hang on: ``first_seen_at``, ``sent_at``, ``last_polled_at``.
+
+        What is deliberately *not* in here is a permanently failed notification.
+        ``mark_failed`` records the error and nothing else; there is no column
+        anywhere that says when a delivery gave up, so any timestamp on such a row
+        would be a guess. That gap belongs in the schema, not in a template.
+        """
+        cutoff = int(time.time()) - days * 86_400
+        return await self._db.fetch_all(
+            "SELECT * FROM ("
+            "  SELECT i.first_seen_at AS ts, 'gefunden' AS kind, q.name AS query_name,"
+            "         COALESCE(i.title, 'Ohne Titel') AS headline, NULL AS sub,"
+            "         i.price AS price, i.currency AS currency, i.url AS href,"
+            "         NULL AS attempts, NULL AS status"
+            "  FROM items i LEFT JOIN queries q ON q.id = i.query_id"
+            "  WHERE i.first_seen_at >= ?"
+            "  UNION ALL"
+            "  SELECT o.sent_at, 'zugestellt', q.name, d.name, i.title,"
+            "         i.price, i.currency, i.url, o.attempts, NULL"
+            "  FROM outbox o"
+            "  JOIN destinations d ON d.id = o.destination_id"
+            "  LEFT JOIN queries q ON q.id = o.query_id"
+            "  LEFT JOIN items i ON i.item_id = o.item_id"
+            "  WHERE o.status = 'sent' AND o.sent_at >= ?"
+            "  UNION ALL"
+            "  SELECT s.last_polled_at, 'fehlgeschlagen', q.name,"
+            "         COALESCE(s.last_status, 'Fehler'), s.last_error,"
+            "         NULL, NULL, NULL, NULL, s.last_status"
+            "  FROM query_state s JOIN queries q ON q.id = s.query_id"
+            "  WHERE s.last_status IS NOT NULL AND s.last_status <> 'ok'"
+            "    AND s.last_polled_at >= ?"
+            ") ORDER BY ts DESC LIMIT ?",
+            (cutoff, cutoff, cutoff, limit),
+        )
+
     async def recent_failures(self, limit: int = 8) -> list[aiosqlite.Row]:
         """The most recent checks that failed, joined to the search that made them."""
         return await self._db.fetch_all(

@@ -50,48 +50,47 @@
   // a redirect throws the answer away: the page reloads and the button that was
   // pressed no longer exists. Forms marked `data-report-done` are posted with
   // fetch instead and end on the button — "Suche starten" → "Wird angelegt…" →
-  // "✓ 12 neue Treffer". Every other form on the site still posts and redirects.
+  // "✓ Wird beobachtet". Every other form on the site still posts and redirects.
   //
-  // The wording comes from the response. A count written here would be a number
-  // the server never agreed to, and this button exists precisely because the
-  // answer is worth having.
+  // The name of the new search comes from the response. The outcome does not,
+  // because a search created a moment ago has not been polled and there is nothing
+  // to count: a number on this button would be one the server never agreed to.
   for (const form of document.querySelectorAll("form[data-report-done]")) {
     const button = form.querySelector('button[type="submit"]');
     if (!button) continue;
     const label = button.querySelector("span");
+    const status = form.querySelector("[data-run-status]");
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
 
-      let data;
+      let response;
       try {
-        const response = await fetch(form.action, {
+        response = await fetch(form.action, {
           method: "POST",
           body: new FormData(form),
           headers: { Accept: "application/json" },
         });
-        if (!response.ok) throw new Error(String(response.status));
-        data = await response.json();
-        if (!data.ok) throw new Error("rejected");
       } catch {
-        // A network drop, a 409, a 422 — anything unexpected goes back through
-        // the plain form post, which renders the server's own sentence in the
-        // flash at the top of the page. One failure path is better than a
-        // second, worse one written just for the fetch.
+        // A network drop, and a 409 or 422 the server refused: anything the fetch
+        // path cannot explain goes back through the plain form post, which renders
+        // the server's own sentence in the flash at the top of the page. One failure
+        // path beats a second, worse one written just for the fetch.
+        form.submit();
+        return;
+      }
+      if (!response.ok) {
         form.submit();
         return;
       }
 
-      // A search created a moment ago has not been polled yet, so `found` is
-      // honestly 0. Saying "wird beobachtet" is the true outcome; saying "0 neue
-      // Treffer" would read as a failure, and inventing "23" would be a lie.
-      const done = data.found > 0 ? `${data.found} neue Treffer` : "Wird beobachtet";
+      // The search exists; nothing has been polled yet, so "wird beobachtet" is
+      // the whole truth. The plain post says the same sentence in the flash.
+      const data = await response.json();
       button.dataset.state = "done";
       button.setAttribute("aria-busy", "false");
-      if (label) label.textContent = done;
-
-      const status = form.querySelector("[data-run-status]");
-      if (status) status.textContent = `${data.name}: ${done}.`;
+      if (label) label.textContent = "Wird beobachtet";
+      if (status) status.textContent = `${data.name} wird jetzt beobachtet.`;
 
       // The button has said its piece; now the page has to agree with it. The
       // table of saved searches is server-rendered, and a list that still shows
@@ -279,24 +278,6 @@
         /* Storage unavailable: the choice still applies for this page view. */
       }
       applyTheme(choice);
-    });
-  }
-
-  // --- Page transitions ---------------------------------------------------------
-  // The content column cross-fades between pages, so moving around the app reads as
-  // one app changing screen rather than five documents loading. Same-document
-  // navigations only, so a form POST is never caught mid-flight.
-  if (document.startViewTransition && !reduced) {
-    document.addEventListener("click", (event) => {
-      const link = event.target.closest?.("a[href]");
-      if (!link || link.target === "_blank" || event.metaKey || event.ctrlKey) return;
-      const url = new URL(link.href, location.href);
-      if (url.origin !== location.origin) return;
-      if (url.pathname === location.pathname && url.search === location.search) return;
-      event.preventDefault();
-      document.startViewTransition(() => {
-        location.href = link.href;
-      });
     });
   }
 

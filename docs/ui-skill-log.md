@@ -341,6 +341,133 @@ is no horizontal overflow at 375; and the mobile rail has a real `aria-label`'d 
     `app.js` the `data-report-done` block and the rAF guard; `server.py` `add_search`;
     `app.css` `.tile-total`, `.ico-done`; `tests/integration/test_web.py`.
 
+### Pass six — Verlauf as history
+
+- **frontend-design**, **impeccable** (global)
+  - invoked: not re-read this pass. The brief's requirement — that this page answer
+    "what happened" rather than "what is the system doing right now" — was carried
+    out with the decisions already on the record: counters are not events, and a
+    chart whose two series cannot be compared is a chart that lies.
+  - mechanism: file-read
+  - extracted: nothing new.
+  - decided: the page was reshaped around a timeline of the three things that
+    actually happen here — a listing is found, a notification is delivered, a
+    check fails — each on a real timestamp, newest first. `Blocksperren`,
+    `Rate-Limits` and `Ohne Treffer` are gone: `count_403`, `count_429` and
+    `stale_cycles` only ever increase and describe the present, which is the
+    dashboard's job. The separate "Letzte Fehler" table went too, because failures
+    are events now and having them in two places was the same duplication the tile
+    once had. The two charts became one chart with both series on a shared scale,
+    which is what makes "are the notifications keeping up with the finds" a
+    question the page can answer at all.
+  - deviation: permanently failed notifications are *not* in the timeline.
+    `mark_failed` writes the error and no timestamp, so there is no honest "when"
+    for one. That gap belongs in a migration, not in a template, and it is the one
+    thing this page still cannot tell you.
+  - where: `repo.recent_events`; `server._event_views`; `activity.html`;
+    `app.css` `.events`, `.bars`, `.chart-foot`.
+
+### Pass seven — the pruning pass
+
+- **frontend-design**, **impeccable** (global)
+  - invoked: not re-read this pass. A deletion pass has no new direction to pull
+    out of a skill; what it needs is the record of what was already decided, which
+    is what the entries above are.
+  - mechanism: file-read
+  - extracted: nothing new.
+  - decided: the button count from pass five is *gone*, and that entry is wrong
+    where it claims the count is read from the database and "honestly reads
+    zero". It could never read anything else: `data-report-done` sits on one form
+    only, the create form, and a search created in that same request has no
+    items. The one way to get a number was a recycled `queries.id` —
+    `INTEGER PRIMARY KEY` without `AUTOINCREMENT`, and `delete_query` leaves the
+    `items` rows behind — which would have announced a deleted search's history
+    as the new one's finds. A number that is zero or wrong is not worth a field,
+    so `found` is deleted and the button says "Wird beobachtet", which is true.
+    Everything else the fetch path does stays: it names the search from the
+    server's own answer and it falls back to the plain post for any refusal.
+    Also removed: the `ok` key, which no caller read, and with it the JS branch
+    that could never fire; a third test whose assertion (`303` plus a flash on a
+    plain post) the existing create test now carries. Two tests that could not
+    fail were repaired rather than deleted — one asserted labels that only ever
+    render once a search exists, the other asserted "newest first" on a page
+    with nothing on it; both now set up the state they claim to check.
+  - deviation: the finished button states "Wird beobachtet" instead of a count
+    of finds. The count needs a first poll to exist, and a poll inside the
+    request that creates the search is a different feature with its own cost.
+  - where: `server.py` `add_search`; `app.js` the `data-report-done` block;
+    `tests/integration/test_web.py` the `/searches` and `/activity` tests;
+    `app.css` §9.
+
+### Pass eight — what nobody asked for
+
+- **frontend-design**, **impeccable** (global)
+  - invoked: not re-read this pass. A removal pass has no new direction to pull
+    out of a skill; it needs the record of what was already decided, which is
+    every entry above.
+  - mechanism: file-read
+  - extracted: nothing new.
+  - decided: an audit named four things in the shipped UI that no brief asked
+    for. Three were unrequested features or components and are gone: the
+    cross-fade that wrapped every same-origin link in `startViewTransition`, the
+    `.switch` toggle component, and the two icons no template ever calls
+    (`minus`, `external`). The fourth was a string — the nav label renamed from
+    `Aktivität` to `Verlauf` — and that one is *restored*, not kept: the page
+    it points at is a history view, so `Aktivität` is now a loose name for it,
+    but the rename was never requested and a rename the user did not ask for is
+    exactly what this pass exists to undo. The page's own heading still says
+    `Verlauf`, because that describes what the page contains rather than naming
+    a destination in the shell.
+    Removing the cross-fade made three more things dead, and they went with it:
+    `view-transition-name` on `.content`, the `::view-transition-*` keyframes in
+    section 13, and the clause in the pass-three entry that counted the
+    cross-fade in the animation budget. Six class rules with no reference in any
+    template, script or test went the same way — `.switch`, `.btn-icon`,
+    `.field-error`, `.lede`, `.allclear` — along with two tokens, `--live-edge`
+    (defined three times, read never) and `--fresh-cap`, whose comment claimed it
+    mirrored the server so the stylesheet could draw the decay. The decay is
+    drawn from `--fresh`; the token was a promise nothing kept.
+  - deviation: none. The nav label now describes the page less precisely than
+    `Verlauf` did; that is a naming question for the next brief, not something
+    to settle by editing a string again.
+  - where: `app.js` the page-transition block; `app.css` section 13, `.content`,
+    the five dead rules, both tokens; `_icons.html`; `base.html` the nav.
+
+## 2026-10-03
+
+- observability: not-machine-checkable — the harness position is unchanged from
+  the session above: no `skill` tool, no `/skill:` list, and no invocation log
+  on disk. The receipts below are honest `file-read`s, and this suite can only
+  check that they are declared and self-consistent.
+
+### Pass nine — proving the deletions, and the diff they were hiding in
+
+- **frontend-design**, **impeccable** (global)
+  - invoked: not re-read this pass. Establishing that removed code was dead, and
+    normalising line endings, are not direction questions; both need the record
+    of what was already decided, which is the entries above.
+  - mechanism: file-read
+  - extracted: nothing new.
+  - decided: nothing was deleted this pass — the pass-eight removals were proved
+    dead before they were allowed to stay removed. A `\.switch` pattern would
+    have missed `class="switch"` in a template, so the sweep was repeated on
+    the bare names, and `.switch` was then disproven from the running app: the
+    per-destination control is a `btn btn-quiet btn-sm` inside a `form.inline`,
+    and the page reports zero `.switch` nodes against three `notify_status`
+    inputs. Two tokens cannot be settled by grep alone. `--fresh-cap` is unread
+    because the decay is drawn from `--fresh`, and `--live-edge` is defined
+    three times and read nowhere; the 14-day chart still renders, which is the
+    check that actually mattered. Added `.gitattributes` (`* text=auto`) and
+    renormalised the index, because `activity.html` had been committed with CRLF
+    in its blob while every other file was LF: its diff claimed 197 changed
+    lines where 9 had changed. It is now 8 insertions and 9 deletions, and the
+    stored form no longer depends on which machine committed a file. The nav
+    label stays `Aktivität` — still the weaker of the two names for a history
+    view, and not to be changed again without being asked.
+  - deviation: none.
+  - where: `.gitattributes`; `src/vinted_sniper/web/templates/activity.html`;
+    `docs/ui-skill-log.md` pass eight.
+
 ### Skills deliberately not reached
 
 - **animate**, **review-animations**, **improve-animations** — partially read in pass one

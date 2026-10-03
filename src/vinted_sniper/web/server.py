@@ -513,26 +513,26 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
         __: None = csrf,
     ) -> Response:
         # One endpoint, two answers. A plain form post wants the 303 and the
-        # flash; the fetch behind `data-report-done` wants the outcome as data so
-        # the button it was pressed on can finish its own sentence. Both are
-        # answered from the code below, so the number the button shows is the
-        # same number the page would have shown.
+        # flash; the fetch behind `data-report-done` wants the name back so the
+        # button it was pressed on can finish its own sentence.
         wants_json = "application/json" in request.headers.get("accept", "")
 
+        # A refusal tells the fetch path only that it was refused: the status code is
+        # the answer, and the reason reaches the user from the flash of the plain
+        # post it falls back to.
         try:
             normalised = urls.normalise_search_url(url)
             tld = urls.extract_tld(normalised)
             params = urls.parse_search_params(normalised)
         except urls.InvalidSearchURLError as exc:
             if wants_json:
-                return JSONResponse({"ok": False, "error": str(exc)}, status_code=422)
+                return JSONResponse({"error": str(exc)}, status_code=422)
             return _redirect_with_error(str(exc), "/searches")
 
         if await repo.find_query_by_url(normalised) is not None:
             if wants_json:
                 return JSONResponse(
-                    {"ok": False, "error": "diese Suche wird bereits beobachtet"},
-                    status_code=409,
+                    {"error": "diese Suche wird bereits beobachtet"}, status_code=409
                 )
             return _redirect_with_error("diese Suche wird bereits beobachtet", "/searches")
 
@@ -550,18 +550,10 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
 
         label = name.strip() or _name_from(params, tld)
         if wants_json:
-            # Read, never invented. A search created a moment ago has not been
-            # polled yet, so `found` is honestly 0 and the button says "wird
-            # beobachtet" for exactly that case. The one thing this must not do
-            # is put a number on the button that the database did not produce.
-            return JSONResponse(
-                {
-                    "ok": True,
-                    "name": label,
-                    "query_id": query_id,
-                    "found": await repo.listing_count(query_id=query_id),
-                }
-            )
+            # Only the name. A search created a moment ago has not been polled, so
+            # there is no count to report: anything the button could put on screen
+            # here would be a number the database did not produce.
+            return JSONResponse({"name": label})
         return _redirect_with_ok(f"„{label}“ wird jetzt beobachtet.")
 
     @app.post("/searches/{query_id}/edit")
@@ -830,6 +822,10 @@ def _delivery_view(stats: DeliveryStats, now: int) -> dict[str, Any]:
 # because "EUR" is the only part of an unfamiliar one that is unambiguous.
 _EURO_SIGN: Final = "€"
 _GROUP_SIZE: Final = 3
+# Two events about the same thing less than a minute apart are one event as far as
+# a person scrolling back is concerned. A minute is also the finest resolution the
+# timestamps in this schema are ever written with, so the window matches the data.
+_EVENT_RUN_WINDOW_S: Final = 60
 
 
 def _money(amount: float, currency: str) -> str:
@@ -900,6 +896,13 @@ def _listing_views(rows: list[Any], now: int) -> list[dict[str, Any]]:
     return views
 
 
+_EVENT_OUTCOME = {
+    "gefunden": "gefunden",
+    "zugestellt": "zugestellt",
+    "fehlgeschlagen": "gescheitert",
+}
+
+
 def _event_views(rows: list[Any], now: int) -> list[dict[str, Any]]:
     """One row of the timeline as the page wants to say it.
 
@@ -915,43 +918,42 @@ def _event_views(rows: list[Any], now: int) -> list[dict[str, Any]]:
     scroll. The count is still the true number of rows it stands for.
     """
     views: list[dict[str, Any]] = []
-    for row in rows:
-        kind = row["kind"]
-        price = row["price"]
-        headline = row["headline"] or ""
+    # The run currently being extended, and the moment it started. Held out here
+    # rather than in the view, so no field has to be written and then taken back
+    # out again. A run is measured against its first event, not its last.
+    run: dict[str, Any] | None = None
+    run_ts = 0
 
-        previous = views[-1] if views else None
-        # Same thing, same subject, inside the same minute: one line, not several.
+    for row in rows:
+        ts = int(row["ts"])
+        headline = row["headline"] or ""
         if (
-            previous is not None
-            and previous["kind"] == kind
-            and previous["headline"] == headline
-            and abs(int(row["ts"]) - previous["_ts"]) < 60
+            run is not None
+            and abs(ts - run_ts) < _EVENT_RUN_WINDOW_S
+            and run["kind"] == row["kind"]
+            and run["headline"] == headline
         ):
-            previous["count"] += 1
+            run["count"] += 1
             # The newest member of a run carries the freshest moment.
-            previous["when"] = _age(row["ts"], now)
+            run["when"] = _age(ts, now)
             continue
 
-        views.append(
-            {
-                "_ts": int(row["ts"]),
-                "kind": kind,
-                "when": _age(row["ts"], now),
-                "query_name": row["query_name"] or "",
-                "headline": headline,
-                "sub": row["sub"] or "",
-                "money": _money(price, row["currency"] or "") if price is not None else "",
-                "href": row["href"] or "",
-                # Only worth saying when it cost something to get there.
-                "retries": (row["attempts"] or 0) > 1,
-                "attempts": row["attempts"] or 0,
-                "status": row["status"] or "",
-                "count": 1,
-            }
-        )
-    for view in views:
-        del view["_ts"]
+        price = row["price"]
+        run = {
+            "kind": row["kind"],
+            "outcome": _EVENT_OUTCOME[row["kind"]],
+            "when": _age(ts, now),
+            "query_name": row["query_name"] or "",
+            "headline": headline,
+            "sub": row["sub"] or "",
+            "money": _money(price, row["currency"] or "") if price is not None else "",
+            "href": row["href"] or "",
+            "attempts": row["attempts"] or 0,
+            "count": 1,
+        }
+        views.append(run)
+        run_ts = ts
+
     return views
 
 

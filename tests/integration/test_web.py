@@ -187,6 +187,9 @@ async def test_adding_a_search_by_pasting_a_url(signed_in: TestClient, repo: Rep
     )
 
     assert response.status_code == 303
+    # The JSON answer is an addition to this endpoint; the no-JavaScript path has
+    # to keep redirecting to the flash it always did.
+    assert "ok=" in response.headers["location"]
     searches = await repo.list_queries()
     assert len(searches) == 1
     assert searches[0].tld == "fr"
@@ -210,12 +213,12 @@ async def test_a_url_that_is_not_a_search_is_rejected_with_advice(
 # --- The same endpoint, asked for data instead of a page ---------------------------
 #
 # `data-report-done` in the template posts this form with fetch so the button can
-# finish its own sentence instead of being thrown away by a redirect. These tests
-# exist because that count is now on screen: a number the client invented would
-# look identical to a number the database produced, and only one of them is true.
+# finish its own sentence instead of being thrown away by a redirect. The name the
+# button then shows has to be the server's: one written in the browser would be a
+# name the server never agreed to.
 
 
-async def test_starting_a_search_answers_a_fetch_with_the_count_it_actually_found(
+async def test_starting_a_search_answers_a_fetch_with_the_name_it_created(
     signed_in: TestClient, repo: Repo
 ) -> None:
     response = signed_in.post(
@@ -225,26 +228,9 @@ async def test_starting_a_search_answers_a_fetch_with_the_count_it_actually_foun
     )
 
     assert response.status_code == 200
-    body = response.json()
-    assert body["ok"] is True
-    assert body["query_id"] == (await repo.list_queries())[0].id
-    # Not a number this test made up: the same read the page would have done.
-    assert body["found"] == await repo.listing_count(query_id=body["query_id"])
-    assert body["found"] == 0, "a search nobody has polled has found nothing"
-
-
-async def test_a_plain_form_post_still_redirects_and_still_shows_the_flash(
-    signed_in: TestClient,
-) -> None:
-    """The JSON answer is an addition. The no-JavaScript path must not change."""
-    response = signed_in.post(
-        "/searches",
-        data={"url": "https://www.vinted.fr/catalog?search_text=nike"},
-        follow_redirects=False,
-    )
-
-    assert response.status_code == 303
-    assert "ok=" in response.headers["location"]
+    # Exactly the name the flash would have carried, and nothing else: the button
+    # reads one field, so a second one would only be a promise nobody keeps.
+    assert response.json() == {"name": (await repo.list_queries())[0].name}
 
 
 @pytest.mark.parametrize(
@@ -267,9 +253,7 @@ async def test_a_refused_search_answers_a_fetch_with_a_status_and_a_reason(
     )
 
     assert response.status_code == status
-    body = response.json()
-    assert body["ok"] is False
-    assert body["error"]
+    assert response.json()["error"]
 
 
 async def test_the_same_search_cannot_be_added_twice(signed_in: TestClient, repo: Repo) -> None:
@@ -740,33 +724,50 @@ async def test_the_activity_page_shows_a_full_window_of_days(signed_in: TestClie
 
     assert 'role="img"' in body
     # One chart of fourteen days, two series in every day: the empty days are the
-    # point, and both series have to be there for the pair to be comparable.
+    # point, and a day with only one bar would make the two incomparable again.
     assert body.count("bar-col") == 14
-    assert body.count("bar-label") == 14
-    assert body.count('class="bar ') == 28, "two bars per day, one per series"
-    assert body.count("is-sent") >= 14, "both series have to be drawn to compare"
+    assert body.count('class="bar ') == 28
+    assert body.count('class="bar is-sent') == 14
 
 
 async def test_the_activity_page_reads_as_history_not_as_monitoring(
     signed_in: TestClient,
 ) -> None:
-    """The page answers "what happened", so the counters that only ever describe
-    the present cannot be on it. `count_403`, `count_429` and
-    `checks_without_new_listings` only ever go up; they are the dashboard's
-    business, and a timeline built from them would be a list of gauges."""
+    """The page answers "what happened". `count_403`, `count_429` and the checks
+    without a find only ever go up — they describe the present, and that is the
+    dashboard's job."""
+    signed_in.post("/searches", data={"url": "https://www.vinted.fr/catalog?search_text=nike"})
     body = signed_in.get("/activity").text
 
     for label in ("Blocksperren", "Rate-Limits", "Ohne Treffer"):
         assert label not in body, f"{label} describes the present, not the past"
 
 
-async def test_the_activity_page_lists_events_newest_first(signed_in: TestClient) -> None:
-    """A timeline whose order is wrong is worse than no timeline: it reads as
-    true. The SQL orders by the event's own timestamp, and this pins that."""
+async def test_the_activity_page_lists_events_newest_first(
+    signed_in: TestClient, repo: Repo, make_item: Callable[..., dict[str, Any]]
+) -> None:
+    """A timeline whose order is wrong is worse than no timeline: it reads as true.
+    The SQL orders by the event's own timestamp, and this pins that."""
+    signed_in.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=nike", "name": "shoes"},
+        follow_redirects=False,
+    )
+    query = (await repo.list_queries())[0]
+    now = int(time.time())
+    await repo.record_new_items(
+        query,
+        [parse_item(make_item(i, photo_ts=now), "fr") for i in (1, 2)],
+        [],
+    )
+    # Both rows were stamped with the same instant, which the timeline would read as
+    # one run. An hour apart is what two separate events look like, and item 2 is the
+    # newer of the two.
+    await repo._db.execute("UPDATE items SET first_seen_at = ? WHERE item_id = 1", (now - 3600,))
+
     body = signed_in.get("/activity").text
 
-    assert "Zuletzt passiert" in body
-    assert "gefunden" in body
+    assert body.index("Item 2") < body.index("Item 1")
 
 
 async def test_a_flash_message_arrives_as_a_query_parameter(signed_in: TestClient) -> None:
