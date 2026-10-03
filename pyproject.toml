@@ -60,6 +60,12 @@ packages = ["src/vinted_sniper"]
 line-length = 100
 target-version = "py313"
 src = ["src", "tests"]
+# ruff is the one quality tool here that runs repo-wide rather than over src/ and
+# tests/. Without this it lints the vendored Python inside the design skills under
+# .claude/skills, which is third-party code carried verbatim on purpose: rewriting
+# it would diverge the skills from their upstreams for no gain. Everything else in
+# .claude/ is still checked -- the blank line here is .claude/verify_skills.py.
+extend-exclude = [".claude/skills"]
 
 [tool.ruff.lint]
 select = [

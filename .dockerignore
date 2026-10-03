@@ -1,6 +1,9 @@
 .venv/
 .git/
 .github/
+# Agent tooling: build-time only, never needed at runtime. Keeps ~14MB of skill
+# content (mostly fonts and reference data) out of the build context.
+.claude/
 data/
 docs/
 tests/
