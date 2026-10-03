@@ -327,7 +327,7 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
         query = await repo.get_query(query_id)
         if query is None:
             raise HTTPException(status_code=404, detail="no such search")
-        rows = [row for row in await repo.recent_items(limit=100) if row["query_id"] == query_id]
+        rows = await repo.recent_items_for_query(query_id)
         return Response(content=_rss_feed(query.name, rows), media_type="application/rss+xml")
 
     return app
