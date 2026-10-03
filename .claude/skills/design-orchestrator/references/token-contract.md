@@ -43,7 +43,10 @@ values:
   elevation steps, most of which are border-only.
 - **Motion.** No durations or curves defined at all. Define a 2–3 step duration scale
   and 2 curves (standard, emphasized).
-- **Font stack.** `base.html` sets no `font-family`. This is a real gap — see below.
+- **Font stack.** `base.html:21` sets `font: 15px/1.55 ui-sans-serif, system-ui,
+  -apple-system, "Segoe UI", sans-serif`. A system stack is a deliberate,
+  zero-latency choice — but it is currently undocumented, so stage 6 must either
+  record it as intentional or replace it. See below.
 
 ---
 
@@ -82,9 +85,17 @@ Rules:
 
 ## Typography: the Inter question
 
-`base.html` currently sets **no `font-family`**, so the UI is rendering in the browser
-default (Times on most systems) while sizing everything in `rem`. That is a genuine
-inconsistency, not a stylistic choice, and it should be fixed at stage 6.
+`base.html:21` sets a system stack via the `font:` shorthand —
+`ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif` — so the UI renders
+in the platform's UI sans-serif, not the Times browser default. That is a real choice
+and an efficient one for a self-hosted tool: no webfont request, no layout shift, no
+FOUT, works offline.
+
+The gap is that the choice is *undocumented* and *inconsistent in how it is applied*.
+It is applied once on `body` through the `font:` shorthand, while every control then
+re-declares `font: inherit` — which works, but means the stack lives in a shorthand
+rather than as a token. Stage 6 should lift it into a `--font-sans` token, record the
+reasoning, and then decide whether it stays.
 
 Inter is not *forbidden* — it is the **unjustified default**. It is acceptable when it
 is chosen deliberately and paired well. It is not acceptable as "whatever the framework
