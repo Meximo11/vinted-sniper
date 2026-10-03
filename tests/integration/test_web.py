@@ -250,7 +250,7 @@ async def test_found_listings_render_as_cards_with_their_gallery(
     item = parse_item(make_item(123, photo_ts=1_755_000_000), "fr")
     await repo.record_new_items(query, [item], [])
 
-    body = signed_in.get("/").text
+    body = signed_in.get("/found").text
 
     assert "listing-grid" in body
     # The whole gallery travels to the page so the lightbox needs no more requests.
@@ -260,6 +260,42 @@ async def test_found_listings_render_as_cards_with_their_gallery(
     assert "@seller" in body
     assert "⭐ 4.5" in body  # feedback_reputation 0.9, on the five-star scale
     assert "Nike" in body
+
+
+async def test_the_dashboard_and_the_feed_are_separate_views(
+    signed_in: TestClient, repo: Repo, make_item: Callable[..., dict[str, Any]]
+) -> None:
+    """The feed is the daily read and belongs on its own page, not below two
+    tables of configuration."""
+    signed_in.post(
+        "/searches",
+        data={"url": "https://www.vinted.fr/catalog?search_text=nike", "name": "my search"},
+        follow_redirects=False,
+    )
+    query = (await repo.list_queries())[0]
+    item = parse_item(make_item(123, photo_ts=1_755_000_000), "fr")
+    await repo.record_new_items(query, [item], [])
+
+    dashboard = signed_in.get("/").text
+    feed = signed_in.get("/found").text
+
+    # The dashboard is configuration only. Matched on the markup element, not the
+    # class name — base.html styles .listing-grid, so the bare string is on both.
+    assert "Searches" in dashboard
+    assert "Destinations" in dashboard
+    assert '<div class="listing-grid">' not in dashboard
+
+    # The feed is the items, and only the items.
+    assert '<div class="listing-grid">' in feed
+    assert "Destinations" not in feed
+
+    # Both views carry the navigation, and each marks itself as current.
+    for body in (dashboard, feed):
+        assert 'href="/found"' in body
+        assert 'href="/"' in body
+    assert 'aria-current="page" href="/found"' not in dashboard
+    assert dashboard.count('aria-current="page"') == 1
+    assert feed.count('aria-current="page"') == 1
 
 
 def test_the_health_api_answers_with_the_snapshot(signed_in: TestClient) -> None:
