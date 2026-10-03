@@ -131,7 +131,6 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
                 "snapshot": snapshot,
                 "destinations": destinations,
                 "auth_enabled": token is not None,
-                "recent": _listing_views(await repo.recent_items(limit=25), now=int(time.time())),
                 "now": int(time.time()),
                 "min_interval": MIN_POLL_INTERVAL_S,
                 "default_interval": settings.poll_default_interval_s,
@@ -141,6 +140,27 @@ def create_app(settings: Settings, repo: Repo, taxonomy: Taxonomy | None = None)
                 "default_tld": (
                     Counter(watched_tlds).most_common(1)[0][0] if watched_tlds else "fr"
                 ),
+            },
+        )
+
+    # --- Found --------------------------------------------------------------------
+
+    @app.get("/found", response_class=HTMLResponse)
+    async def found(
+        request: Request,
+        session: Annotated[str | None, Cookie(alias=SESSION_COOKIE)] = None,
+    ) -> Response:
+        """The items feed. Split from the dashboard so the daily read is not sitting
+        below two tables of configuration."""
+        if not _authorised(session, token):
+            return RedirectResponse("/login", status_code=303)
+
+        return TEMPLATES.TemplateResponse(
+            request,
+            "found.html",
+            {
+                "auth_enabled": token is not None,
+                "recent": _listing_views(await repo.recent_items(limit=25), now=int(time.time())),
             },
         )
 
