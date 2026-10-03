@@ -441,6 +441,20 @@ class Repo:
             (limit,),
         )
 
+    async def recent_items_for_query(self, query_id: int) -> list[aiosqlite.Row]:
+        """Every stored listing one search found, newest first.
+
+        Deliberately no LIMIT. This is what a search's RSS feed is built from, and a feed
+        that silently stops at some arbitrary count is worse than a long one: a reader
+        cannot tell listings were dropped. `item_retention_days` already bounds the table,
+        and this query is what keeps that pruning honest for one search rather than for the
+        account as a whole.
+        """
+        return await self._db.fetch_all(
+            "SELECT i.* FROM items i WHERE i.query_id = ? ORDER BY i.first_seen_at DESC",
+            (query_id,),
+        )
+
     # --- Outbox delivery -----------------------------------------------------------
 
     async def destinations_with_work(self) -> list[int]:

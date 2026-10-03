@@ -319,6 +319,49 @@ async def test_the_rss_feed_needs_the_token(signed_in: TestClient, repo: Repo) -
     assert response.text.startswith("<?xml")
 
 
+async def test_the_rss_feed_is_not_truncated_when_the_account_is_busy(
+    signed_in: TestClient,
+    repo: Repo,
+    db: Database,
+    make_item: Callable[..., dict[str, Any]],
+) -> None:
+    """A search's feed is that search's listings, whatever else the account is finding.
+
+    The feed used to read the hundred most recent items across every search and keep the
+    ones belonging to this one. That is a silent drop, not a cap: a quiet search lost its
+    older listings the moment the busier searches pushed them past row hundred.
+    """
+    for name in ("quiet", "busy"):
+        signed_in.post(
+            "/searches",
+            data={"url": f"https://www.vinted.fr/catalog?search_text={name}", "name": name},
+            follow_redirects=False,
+        )
+    queries = {query.name: query for query in await repo.list_queries()}
+
+    def listings(ids: range) -> list[Any]:
+        return [parse_item(make_item(i, photo_ts=1_755_000_000), "fr") for i in ids]
+
+    await repo.record_new_items(queries["quiet"], listings(range(1, 121)), [])
+    # The busy search finds its listings later, so the quiet search's sit below a page of
+    # other searches' items — exactly where the old global-then-filter read lost them.
+    await db.execute(
+        "UPDATE items SET first_seen_at = first_seen_at - 1000 WHERE query_id = ?",
+        (queries["quiet"].id,),
+    )
+    await repo.record_new_items(queries["busy"], listings(range(121, 151)), [])
+    assert await db.fetch_value("SELECT COUNT(*) FROM items") == 150
+
+    body = signed_in.get(f"/rss/{queries['quiet'].id}.xml?key={TOKEN}").text
+
+    # All 120, not the 70 the global read would have left behind.
+    assert body.count("<item>") == 120
+    for item_id in range(1, 121):
+        assert f"<guid isPermaLink='false'>{item_id}</guid>" in body
+    # And scoping it to one search did not turn it into the account's feed.
+    assert "<guid isPermaLink='false'>121</guid>" not in body
+
+
 # --- The advanced-search builder ------------------------------------------------------
 
 
